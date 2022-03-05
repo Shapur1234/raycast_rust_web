@@ -170,15 +170,15 @@ impl Tile {
 
 // --------------------------------------------------------------------------------
 
-#[derive(Debug)]
-struct InputInfo {
-    forward: bool,
-    backward: bool,
-    right: bool,
-    left: bool,
-    rot_right: bool,
-    rot_left: bool,
-}
+// #[derive(Debug)]
+// struct InputInfo {
+//     forward: bool,
+//     backward: bool,
+//     right: bool,
+//     left: bool,
+//     rot_right: bool,
+//     rot_left: bool,
+// }
 
 #[derive(Debug)]
 struct Camera {
@@ -206,53 +206,53 @@ impl Camera {
         }
         output
     }
-    fn update_from_input(&mut self, level: &Level, input: InputInfo) {
-        let mut x_change: f32 = 0.0;
-        let mut y_change: f32 = 0.0;
+    // fn update_from_input(&mut self, level: &Level, input: InputInfo) {
+    //     let mut x_change: f32 = 0.0;
+    //     let mut y_change: f32 = 0.0;
 
-        if input.rot_right {
-            self.rotation.mod_value(10.0)
-        }
-        if input.rot_left {
-            self.rotation.mod_value(-10.0)
-        }
+    //     if input.rot_right {
+    //         self.rotation.mod_value(10.0)
+    //     }
+    //     if input.rot_left {
+    //         self.rotation.mod_value(-10.0)
+    //     }
 
-        if input.forward {
-            x_change += MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().cos();
-            y_change += MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().sin();
-        }
-        if input.backward {
-            x_change -= MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().cos();
-            y_change -= MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().sin();
-        }
-        if input.right {
-            x_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() + 1.570796).cos();
-            y_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() + 1.570796).sin();
-        }
-        if input.left {
-            x_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() - 1.570796).cos();
-            y_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() - 1.570796).sin();
-        }
+    //     if input.forward {
+    //         x_change += MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().cos();
+    //         y_change += MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().sin();
+    //     }
+    //     if input.backward {
+    //         x_change -= MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().cos();
+    //         y_change -= MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().sin();
+    //     }
+    //     if input.right {
+    //         x_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() + 1.570796).cos();
+    //         y_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() + 1.570796).sin();
+    //     }
+    //     if input.left {
+    //         x_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() - 1.570796).cos();
+    //         y_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() - 1.570796).sin();
+    //     }
 
-        if !level
-            .get_tile(&Point {
-                x: self.pos.x + x_change,
-                y: self.pos.y,
-            })
-            .solid
-        {
-            self.pos.x += x_change
-        }
-        if !level
-            .get_tile(&Point {
-                x: self.pos.x,
-                y: self.pos.y + y_change,
-            })
-            .solid
-        {
-            self.pos.y += y_change
-        }
-    }
+    //     if !level
+    //         .get_tile(&Point {
+    //             x: self.pos.x + x_change,
+    //             y: self.pos.y,
+    //         })
+    //         .solid
+    //     {
+    //         self.pos.x += x_change
+    //     }
+    //     if !level
+    //         .get_tile(&Point {
+    //             x: self.pos.x,
+    //             y: self.pos.y + y_change,
+    //         })
+    //         .solid
+    //     {
+    //         self.pos.y += y_change
+    //     }
+    // }
 }
 
 // --------------------------------------------------------------------------------
