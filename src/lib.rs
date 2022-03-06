@@ -1,6 +1,5 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
@@ -11,13 +10,8 @@ const MOVEMENT_SPEED_MODIFIER: f32 = 0.05;
 const INTERNAL_RESOLUTION_MULTIPLIER: u32 = 16;
 
 static mut player_camera: Camera = Camera {
-    pos: Point {
-        x: 1.5,
-        y: 1.5,
-    },
-    rotation: Rotation {
-        degree: 0.0,
-    },
+    pos: Point { x: 1.5, y: 1.5 },
+    rotation: Rotation { degree: 0.0 },
 };
 
 // --------------------------------------------------------------------------------
@@ -47,7 +41,7 @@ fn request_animation_frame(f: &Closure<dyn FnMut()>) {
 
 // --------------------------------------------------------------------------------
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Rect {
     x: usize,
     y: usize,
@@ -75,7 +69,7 @@ impl Rect {
 
 // --------------------------------------------------------------------------------
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Level {
     layout: Vec<Vec<Tile>>,
     width: usize,
@@ -112,7 +106,7 @@ impl Level {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Color {
     r: u8,
     g: u8,
@@ -145,7 +139,7 @@ enum TileType {
     Yellow,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Tile {
     solid: bool,
     transparent: bool,
@@ -174,17 +168,17 @@ impl Tile {
 
 // --------------------------------------------------------------------------------
 
-// #[derive(Debug)]
-// struct InputInfo {
-//     forward: bool,
-//     backward: bool,
-//     right: bool,
-//     left: bool,
-//     rot_right: bool,
-//     rot_left: bool,
-// }
+#[derive(Debug, Clone)]
+struct InputInfo {
+    forward: bool,
+    backward: bool,
+    right: bool,
+    left: bool,
+    rot_right: bool,
+    rot_left: bool,
+}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Camera {
     pos: Point,
     rotation: Rotation,
@@ -210,58 +204,58 @@ impl Camera {
         }
         output
     }
-    // fn update_from_input(&mut self, level: &Level, input: InputInfo) {
-    //     let mut x_change: f32 = 0.0;
-    //     let mut y_change: f32 = 0.0;
+    fn update_from_input(&mut self, level: &Level, input: InputInfo) {
+        let mut x_change: f32 = 0.0;
+        let mut y_change: f32 = 0.0;
 
-    //     if input.rot_right {
-    //         self.rotation.mod_value(10.0)
-    //     }
-    //     if input.rot_left {
-    //         self.rotation.mod_value(-10.0)
-    //     }
+        if input.rot_right {
+            self.rotation.mod_value(10.0)
+        }
+        if input.rot_left {
+            self.rotation.mod_value(-10.0)
+        }
 
-    //     if input.forward {
-    //         x_change += MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().cos();
-    //         y_change += MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().sin();
-    //     }
-    //     if input.backward {
-    //         x_change -= MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().cos();
-    //         y_change -= MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().sin();
-    //     }
-    //     if input.right {
-    //         x_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() + 1.570796).cos();
-    //         y_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() + 1.570796).sin();
-    //     }
-    //     if input.left {
-    //         x_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() - 1.570796).cos();
-    //         y_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() - 1.570796).sin();
-    //     }
+        if input.forward {
+            x_change += MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().cos();
+            y_change += MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().sin();
+        }
+        if input.backward {
+            x_change -= MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().cos();
+            y_change -= MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().sin();
+        }
+        if input.right {
+            x_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() + 1.570796).cos();
+            y_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() + 1.570796).sin();
+        }
+        if input.left {
+            x_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() - 1.570796).cos();
+            y_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() - 1.570796).sin();
+        }
 
-    //     if !level
-    //         .get_tile(&Point {
-    //             x: self.pos.x + x_change,
-    //             y: self.pos.y,
-    //         })
-    //         .solid
-    //     {
-    //         self.pos.x += x_change
-    //     }
-    //     if !level
-    //         .get_tile(&Point {
-    //             x: self.pos.x,
-    //             y: self.pos.y + y_change,
-    //         })
-    //         .solid
-    //     {
-    //         self.pos.y += y_change
-    //     }
-    // }
+        if !level
+            .get_tile(&Point {
+                x: self.pos.x + x_change,
+                y: self.pos.y,
+            })
+            .solid
+        {
+            self.pos.x += x_change
+        }
+        if !level
+            .get_tile(&Point {
+                x: self.pos.x,
+                y: self.pos.y + y_change,
+            })
+            .solid
+        {
+            self.pos.y += y_change
+        }
+    }
 }
 
 // --------------------------------------------------------------------------------
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Rotation {
     degree: f32,
 }
@@ -293,7 +287,7 @@ fn clamp_degrees(value: f32) -> f32 {
 
 // --------------------------------------------------------------------------------
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Point {
     x: f32,
     y: f32,
@@ -470,7 +464,7 @@ pub fn start() -> Result<(), JsValue> {
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .unwrap();
 
-    let current_level = Level::new(vec![
+    let current_level: Level = Level::new(vec![
         vec![
             Tile::new(TileType::Stone),
             Tile::new(TileType::Stone),
@@ -520,23 +514,35 @@ pub fn start() -> Result<(), JsValue> {
             Tile::new(TileType::Stone),
         ],
     ]);
-    
+
+    // Keyboard input
     {
-        let closure = Closure::wrap(Box::new(move |event: web_sys::KeyboardEvent| {
-            unsafe {
-                player_camera.rotation.degree += 10.0;
-            }
-            console_log!("{:?}", event.key_code());
+        let current_level_2 = current_level.clone();
+        let closure = Closure::wrap(Box::new(|event: web_sys::KeyboardEvent| unsafe {
+            let pressed_key = event.key_code();
+            player_camera.update_from_input(
+                &current_level_2,
+                InputInfo {
+                    forward: if pressed_key == 87 { true } else { false },
+                    backward: if pressed_key == 83 { true } else { false },
+                    right: if pressed_key == 68 { true } else { false },
+                    left: if pressed_key == 65 { true } else { false },
+                    rot_right: if pressed_key == 69 { true } else { false },
+                    rot_left: if pressed_key == 81 { true } else { false },
+                },
+            );
         }) as Box<dyn FnMut(_)>);
-        window
-            .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())?;
+        window.add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())?;
         closure.forget();
+    }
+    // Mouse input
+    {
+        let closure = Closure::wrap(Box::new )
     }
 
     // Game loop
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
         draw_background(&game_canvas);
-        
         unsafe {
             draw_walls(&game_canvas, &player_camera, &current_level);
             draw_minimap(&game_canvas, &player_camera, &current_level);
