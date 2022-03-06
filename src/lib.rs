@@ -6,6 +6,7 @@ use wasm_bindgen::JsCast;
 const SCREEN_WIDTH: usize = 1280;
 const SCREEN_HEIGHT: usize = 760;
 const FOV: u32 = 80;
+const LOOK_SPEED_MODIFIER: f32 = 0.5;
 const MOVEMENT_SPEED_MODIFIER: f32 = 0.05;
 const INTERNAL_RESOLUTION_MULTIPLIER: u32 = 16;
 
@@ -518,7 +519,7 @@ pub fn start() -> Result<(), JsValue> {
     // Keyboard input
     {
         let current_level_2 = current_level.clone();
-        let closure = Closure::wrap(Box::new(|event: web_sys::KeyboardEvent| unsafe {
+        let closure = Closure::wrap(Box::new(move |event: web_sys::KeyboardEvent| unsafe {
             let pressed_key = event.key_code();
             player_camera.update_from_input(
                 &current_level_2,
@@ -537,7 +538,11 @@ pub fn start() -> Result<(), JsValue> {
     }
     // Mouse input
     {
-        let closure = Closure::wrap(Box::new )
+        let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| unsafe {
+            player_camera.rotation.degree += ((event.movement_x() * 10) as f32) * MOVEMENT_SPEED_MODIFIER;
+        }) as Box<dyn FnMut(_)>);
+        window.add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())?;
+        closure.forget();
     }
 
     // Game loop
