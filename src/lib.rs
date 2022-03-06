@@ -1,6 +1,6 @@
-
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
@@ -10,22 +10,26 @@ const FOV: u32 = 80;
 const MOVEMENT_SPEED_MODIFIER: f32 = 0.05;
 const INTERNAL_RESOLUTION_MULTIPLIER: u32 = 16;
 
+static mut player_camera: Camera = Camera {
+    pos: Point {
+        x: 1.5,
+        y: 1.5,
+    },
+    rotation: Rotation {
+        degree: 0.0,
+    },
+};
+
 // --------------------------------------------------------------------------------
 
 #[wasm_bindgen]
 extern "C" {
-    // Use `js_namespace` here to bind `console.log(..)` instead of just
-    // `log(..)`
     #[wasm_bindgen(js_namespace = console)]
     fn log(s: &str);
 
-    // The `console.log` is quite polymorphic, so we can bind it with multiple
-    // signatures. Note that we need to use `js_name` to ensure we always call
-    // `log` in JS.
     #[wasm_bindgen(js_namespace = console, js_name = log)]
     fn log_u32(a: u32);
 
-    // Multiple arguments too!
     #[wasm_bindgen(js_namespace = console, js_name = log)]
     fn log_many(a: &str, b: &str);
 }
@@ -446,26 +450,26 @@ fn rgb_to_u32(red: u8, green: u8, blue: u8) -> u32 {
 }
 
 #[wasm_bindgen(start)]
-pub fn run() -> Result<(), JsValue> {
+pub fn start() -> Result<(), JsValue> {
     let f = Rc::new(RefCell::new(None));
     let g = f.clone();
 
-    let game_canvas = web_sys::window()
-        .unwrap()
-        .document()
-        .unwrap()
-        .get_element_by_id("canvas")
+    let window = web_sys::window().unwrap();
+    let document = window.document().unwrap();
+
+    let game_cavas_html = document
+        .get_element_by_id("game_canvas")
         .unwrap()
         .dyn_into::<web_sys::HtmlCanvasElement>()
         .map_err(|_| ())
-        .unwrap()
+        .unwrap();
+    let game_canvas = game_cavas_html
         .get_context("2d")
         .unwrap()
         .unwrap()
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .unwrap();
 
-    let mut player_camera = Camera::new(Point::new(1.0, 1.0));
     let current_level = Level::new(vec![
         vec![
             Tile::new(TileType::Stone),
@@ -516,13 +520,27 @@ pub fn run() -> Result<(), JsValue> {
             Tile::new(TileType::Stone),
         ],
     ]);
+    
+    {
+        let closure = Closure::wrap(Box::new(move |event: web_sys::KeyboardEvent| {
+            unsafe {
+                player_camera.rotation.degree += 10.0;
+            }
+            console_log!("{:?}", event.key_code());
+        }) as Box<dyn FnMut(_)>);
+        window
+            .add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())?;
+        closure.forget();
+    }
 
     // Game loop
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
         draw_background(&game_canvas);
-        draw_minimap(&game_canvas, &player_camera, &current_level);
-        draw_walls(&game_canvas, &player_camera, &current_level);
-
+        
+        unsafe {
+            draw_walls(&game_canvas, &player_camera, &current_level);
+            draw_minimap(&game_canvas, &player_camera, &current_level);
+        }
         request_animation_frame(f.borrow().as_ref().unwrap());
     }) as Box<dyn FnMut()>));
 

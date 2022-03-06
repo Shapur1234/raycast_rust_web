@@ -17,6 +17,11 @@ features = [
   'CanvasRenderingContext2d',
   'Document',
   'Element',
+  'EventTarget',
   'HtmlCanvasElement',
+  'HtmlElement',
+  'MouseEvent',
+  'KeyboardEvent',
+  'EventListener',
   'Window',
 ]

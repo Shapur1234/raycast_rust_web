@@ -1,4 +1,4 @@
-// For more comments about what's going on here, check out the `hello_world`
-// example.
-import('./pkg')
+const rust = import('./pkg');
+rust
+  .then(m => m.greet('World!'))
   .catch(console.error);

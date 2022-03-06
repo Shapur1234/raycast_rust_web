@@ -1,13 +1,15 @@
 <html><head>
     <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
-  
-<link rel="preload" href="/index-be1fdc4dd6280672_bg.wasm" as="fetch" type="application/wasm" crossorigin="">
-<link rel="modulepreload" href="/index-be1fdc4dd6280672.js"></head>
-  <body style="position: relative;">
-    <canvas id="canvas" width="1280" height="760" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);"></canvas>
-  
 
-<script type="module">import init from '/index-be1fdc4dd6280672.js';init('/index-be1fdc4dd6280672_bg.wasm');</script><script>(function () {
+<link rel="preload" href="/index-f0a2291700e266ad_bg.wasm" as="fetch" type="application/wasm" crossorigin="">
+<link rel="modulepreload" href="/index-f0a2291700e266ad.js"></head>
+
+<body style="position: relative;">
+    <canvas id="game_canvas" width="1280" height="760" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);"></canvas>
+    <script type="text/jsx" src="./index.js"></script>
+
+
+<script type="module">import init from '/index-f0a2291700e266ad.js';init('/index-f0a2291700e266ad_bg.wasm');</script><script>(function () {
     var url = 'ws://' + window.location.host + '/_trunk/ws';
     var poll_interval = 5000;
     var reload_upon_connect = () => {
