@@ -541,7 +541,7 @@ pub fn start() -> Result<(), JsValue> {
         let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| unsafe {
             player_camera.rotation.degree += ((event.movement_x() * 10) as f32) * MOVEMENT_SPEED_MODIFIER;
         }) as Box<dyn FnMut(_)>);
-        window.add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())?;
+        game_cavas_html.add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())?;
         closure.forget();
     }
 
