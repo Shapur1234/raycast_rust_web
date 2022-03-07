@@ -24,4 +24,5 @@ features = [
   'KeyboardEvent',
   'EventListener',
   'Window',
+  'ImageData',
 ]

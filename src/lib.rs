@@ -161,6 +161,11 @@ impl Color {
             ((self.b as f32 / (distance * 0.6)) as u8).clamp(self.b / 10, self.b),
         )
     }
+    fn distance_self(&mut self, distance: f32) {
+        self.r = ((self.r as f32 / (distance * 0.6)) as u8).clamp(self.r / 10, self.r);
+        self.g = ((self.g as f32 / (distance * 0.6)) as u8).clamp(self.g / 10, self.g);
+        self.b = ((self.b as f32 / (distance * 0.6)) as u8).clamp(self.b / 10, self.b);
+    }
     fn to_u32(&self) -> u32 {
         rgb_to_u32(self.r, self.g, self.b)
     }
@@ -344,7 +349,10 @@ fn draw_rect(dest: &web_sys::CanvasRenderingContext2d, rect: Rect) {
     )
 }
 fn draw_rect_distanced(dest: &web_sys::CanvasRenderingContext2d, rect: Rect, distance: f32) {
-    dest.set_fill_style(&JsValue::from_str(&format!("#{:06x}", rect.color.get_color_from_distance(distance))));
+    dest.set_fill_style(&JsValue::from_str(&format!(
+        "#{:06x}",
+        rect.color.get_color_from_distance(distance)
+    )));
     dest.fill_rect(
         rect.x as f64,
         rect.y as f64,
@@ -352,32 +360,44 @@ fn draw_rect_distanced(dest: &web_sys::CanvasRenderingContext2d, rect: Rect, dis
         rect.height as f64,
     )
 }
+fn draw_rect_to_buffer(dest: &mut Vec<u8>, rect: &mut Rect) {
+    rect.fit_self_to_screen();
+    for y in 0..rect.height {
+        for x in 0..rect.width {
+            let pos: usize = (((rect.y + y) * SCREEN_WIDTH) + rect.x + x) * 4;
+            dest[pos + 0] = rect.color.r;
+            dest[pos + 1] = rect.color.g;
+            dest[pos + 2] = rect.color.b;
+            dest[pos + 3] = 255;
+        }
+    }
+}
+fn draw_rect_to_buffer_distanced(dest: &mut Vec<u8>, rect: &mut Rect, distance: f32) {
+    rect.color.distance_self(distance);
+    draw_rect_to_buffer(dest, rect);
+}
 fn draw_not_running(dest: &web_sys::CanvasRenderingContext2d) {
     const NOT_RUNNING_RECTS: [Rect; 1] = [Rect {
         x: 0,
         y: 0,
         width: SCREEN_WIDTH,
         height: SCREEN_HEIGHT,
-        color: Color {
-            r: 0,
-            g: 0,
-            b: 0,
-        },
+        color: Color { r: 0, g: 0, b: 0 },
     }];
 
     for rect in NOT_RUNNING_RECTS {
         draw_rect(&dest, rect);
     }
 }
-fn draw_background(dest: &web_sys::CanvasRenderingContext2d) {
-    draw_rect(
-        &dest,
-        Rect {
+fn draw_background(dest: &mut Vec<u8>) {
+    draw_rect_to_buffer(
+        dest,
+        &mut Rect {
             x: 0,
             y: 0,
             width: SCREEN_WIDTH,
             height: SCREEN_HEIGHT,
-            color: Color::new(20, 20, 20),
+            color: Color::new(0xf, 0xf, 0xf),
         },
     )
 }
@@ -393,9 +413,7 @@ fn draw_minimap(dest: &web_sys::CanvasRenderingContext2d, camera: &Camera, level
                     y: (y + 1) * TILE_SIZE,
                     width: TILE_SIZE,
                     height: TILE_SIZE,
-                    color: level
-                        .get_tile(&Point::new(x as f32, y as f32))
-                        .base_color,
+                    color: level.get_tile(&Point::new(x as f32, y as f32)).base_color,
                 },
             );
         }
@@ -458,7 +476,7 @@ fn draw_walls(dest: &web_sys::CanvasRenderingContext2d, camera: &Camera, level: 
     let mut wall_distances: Vec<f32> = vec![];
     let mut wall_base_colors: Vec<&Color> = vec![];
     let mut cast_results: Vec<Point> = vec![];
-    
+
     for angle in camera.get_angles_to_cast() {
         cast_results.push(cast_ray(&camera.pos, &angle, &level));
     }
@@ -480,13 +498,75 @@ fn draw_walls(dest: &web_sys::CanvasRenderingContext2d, camera: &Camera, level: 
                         + ((wall_height / (texture.height as f32)) * i as f32) as usize,
                     width: SLICE_WIDTH + 1,
                     height: (wall_height / (texture.height as f32)) as usize + 1,
-                    color: *texture
-                        .get_color(&Point {
-                            x: ((cast_results[loop_count].x + cast_results[loop_count].y) * (texture.width as f32)) % (texture.width as f32),
-                            y: i as f32,
-                        }),
+                    color: *texture.get_color(&Point {
+                        x: ((cast_results[loop_count].x + cast_results[loop_count].y)
+                            * (texture.width as f32))
+                            % (texture.width as f32),
+                        y: i as f32,
+                    }),
                 },
-                wall_distance
+                wall_distance,
+            );
+        }
+        loop_count += 1;
+    }
+}
+fn draw_walls_to_buffer(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
+    let texture = Texture::new(
+        vec![
+            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        ],
+        vec![Color::new(205, 84, 75), Color::new(123, 46, 47)],
+    );
+    const SLICE_WIDTH: usize = SCREEN_WIDTH / (FOV * INTERNAL_RESOLUTION_MULTIPLIER) as usize;
+    let mut wall_distances: Vec<f32> = vec![];
+    let mut wall_base_colors: Vec<&Color> = vec![];
+    let mut cast_results: Vec<Point> = vec![];
+
+    for angle in camera.get_angles_to_cast() {
+        cast_results.push(cast_ray(&camera.pos, &angle, &level));
+    }
+
+    for cast_result in &cast_results {
+        wall_distances.push(calc_distance_between_points(&camera.pos, &cast_result));
+        wall_base_colors.push(&level.get_tile(&cast_result).base_color)
+    }
+
+    let mut loop_count: usize = 0;
+    for wall_distance in wall_distances {
+        let wall_height: f32 = (SCREEN_HEIGHT as f32 * 0.8) / wall_distance;
+        for i in 0..texture.height - 1 {
+            draw_rect_to_buffer_distanced(
+                dest,
+                &mut Rect {
+                    x: SLICE_WIDTH * loop_count,
+                    y: ((SCREEN_HEIGHT as f32 - wall_height) / 2.0) as usize
+                        + ((wall_height / (texture.height as f32)) * i as f32) as usize,
+                    width: SLICE_WIDTH + 1,
+                    height: (wall_height / (texture.height as f32)) as usize + 1,
+                    color: *texture.get_color(&Point {
+                        x: ((cast_results[loop_count].x + cast_results[loop_count].y)
+                            * (texture.width as f32))
+                            % (texture.width as f32),
+                        y: i as f32,
+                    }),
+                },
+                wall_distance,
             );
         }
         loop_count += 1;
@@ -522,6 +602,17 @@ fn cast_ray(pos: &Point, rotation: &Rotation, level: &Level) -> Point {
 }
 fn rgb_to_u32(red: u8, green: u8, blue: u8) -> u32 {
     (0x10000 * red as u32) + (0x100 * green as u32) + (blue as u32)
+}
+fn draw_buffer_to_canvas(buffer: Vec<u8>, dest: &web_sys::CanvasRenderingContext2d) {
+    dest.put_image_data(
+        &web_sys::ImageData::new_with_u8_clamped_array(
+            wasm_bindgen::Clamped { 0: &buffer },
+            SCREEN_WIDTH as u32,
+        )
+        .unwrap(),
+        0.0,
+        0.0,
+    );
 }
 
 #[wasm_bindgen(start)]
@@ -687,17 +778,17 @@ pub fn start() -> Result<(), JsValue> {
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
         unsafe {
             if GAME_RUNNING {
-                // let mut buffer: Vec<u8> = vec![0; SCREEN_WIDTH * SCREEN_HEIGHT];
+                let mut buffer: Vec<u8> = vec![0; SCREEN_WIDTH * SCREEN_HEIGHT * 4];
+                draw_background(&mut buffer);
+                // draw_walls(&game_canvas, &PLAYER_CAMERA, &current_level);
+                draw_walls_to_buffer(&mut buffer, &PLAYER_CAMERA, &current_level);
+                draw_buffer_to_canvas(buffer, &game_canvas);
 
-
-                draw_background(&game_canvas);
-                draw_walls(&game_canvas, &PLAYER_CAMERA, &current_level);
                 draw_minimap(&game_canvas, &PLAYER_CAMERA, &current_level);
             } else {
                 draw_not_running(&game_canvas);
             }
         }
-
         request_animation_frame(f.borrow().as_ref().unwrap());
     }) as Box<dyn FnMut()>));
 
