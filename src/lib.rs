@@ -49,7 +49,7 @@ struct Rect {
     y: usize,
     width: usize,
     height: usize,
-    color: u32,
+    color: Color,
 }
 
 impl Rect {
@@ -139,7 +139,7 @@ impl Level {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 struct Color {
     r: u8,
     g: u8,
@@ -335,7 +335,16 @@ impl Point {
 // --------------------------------------------------------------------------------
 
 fn draw_rect(dest: &web_sys::CanvasRenderingContext2d, rect: Rect) {
-    dest.set_fill_style(&JsValue::from_str(&format!("#{:06x}", rect.color)));
+    dest.set_fill_style(&JsValue::from_str(&format!("#{:06x}", rect.color.to_u32())));
+    dest.fill_rect(
+        rect.x as f64,
+        rect.y as f64,
+        rect.width as f64,
+        rect.height as f64,
+    )
+}
+fn draw_rect_distanced(dest: &web_sys::CanvasRenderingContext2d, rect: Rect, distance: f32) {
+    dest.set_fill_style(&JsValue::from_str(&format!("#{:06x}", rect.color.get_color_from_distance(distance))));
     dest.fill_rect(
         rect.x as f64,
         rect.y as f64,
@@ -349,7 +358,11 @@ fn draw_not_running(dest: &web_sys::CanvasRenderingContext2d) {
         y: 0,
         width: SCREEN_WIDTH,
         height: SCREEN_HEIGHT,
-        color: 0x00000000,
+        color: Color {
+            r: 0,
+            g: 0,
+            b: 0,
+        },
     }];
 
     for rect in NOT_RUNNING_RECTS {
@@ -364,7 +377,7 @@ fn draw_background(dest: &web_sys::CanvasRenderingContext2d) {
             y: 0,
             width: SCREEN_WIDTH,
             height: SCREEN_HEIGHT,
-            color: 0x00202020,
+            color: Color::new(20, 20, 20),
         },
     )
 }
@@ -382,8 +395,7 @@ fn draw_minimap(dest: &web_sys::CanvasRenderingContext2d, camera: &Camera, level
                     height: TILE_SIZE,
                     color: level
                         .get_tile(&Point::new(x as f32, y as f32))
-                        .base_color
-                        .to_u32(),
+                        .base_color,
                 },
             );
         }
@@ -399,7 +411,7 @@ fn draw_minimap(dest: &web_sys::CanvasRenderingContext2d, camera: &Camera, level
                 y: ((camera.pos.y + 1.0) * (TILE_SIZE as f32)) as usize - TILE_SIZE / 4,
                 width: TILE_SIZE / 2,
                 height: TILE_SIZE / 2,
-                color: 0x0ff0000,
+                color: Color::new(255, 0, 0),
             },
         );
     }
@@ -415,39 +427,11 @@ fn draw_minimap(dest: &web_sys::CanvasRenderingContext2d, camera: &Camera, level
                 y: ((cast_result.y + 1.0) * (TILE_SIZE as f32)) as usize - TILE_SIZE / 8,
                 width: TILE_SIZE / 4,
                 height: TILE_SIZE / 4,
-                color: 0x00000ff,
+                color: Color::new(0, 0, 255),
             },
         );
     }
 }
-// fn draw_walls(dest: &web_sys::CanvasRenderingContext2d, camera: &Camera, level: &Level) {
-//     const SLICE_WIDTH: usize = SCREEN_WIDTH / (FOV * INTERNAL_RESOLUTION_MULTIPLIER) as usize;
-//     let mut wall_distances: Vec<f32> = vec![];
-//     let mut wall_base_colors: Vec<&Color> = vec![];
-
-//     for angle in camera.get_angles_to_cast() {
-//         let cast_result: Point = cast_ray(&camera.pos, &angle, &level);
-//         wall_distances.push(calc_distance_between_points(&camera.pos, &cast_result));
-//         wall_base_colors.push(&level.get_tile(&cast_result).base_color)
-//     }
-
-//     let mut loop_count: usize = 0;
-//     for wall_distance in wall_distances {
-//         let wall_height: f32 = (SCREEN_HEIGHT as f32 * 0.8) / wall_distance;
-
-//         draw_rect(
-//             dest,
-//             Rect {
-//                 x: SLICE_WIDTH * loop_count,
-//                 y: ((SCREEN_HEIGHT as f32 / 2.0) - (wall_height / 2.0)) as usize,
-//                 width: SLICE_WIDTH + 1,
-//                 height: wall_height as usize,
-//                 color: wall_base_colors[loop_count].get_color_from_distance(wall_distance),
-//             },
-//         );
-//         loop_count += 1;
-//     }
-// }
 fn draw_walls(dest: &web_sys::CanvasRenderingContext2d, camera: &Camera, level: &Level) {
     let texture = Texture::new(
         vec![
@@ -488,7 +472,7 @@ fn draw_walls(dest: &web_sys::CanvasRenderingContext2d, camera: &Camera, level: 
     for wall_distance in wall_distances {
         let wall_height: f32 = (SCREEN_HEIGHT as f32 * 0.8) / wall_distance;
         for i in 0..texture.height - 1 {
-            draw_rect(
+            draw_rect_distanced(
                 dest,
                 Rect {
                     x: SLICE_WIDTH * loop_count,
@@ -496,13 +480,13 @@ fn draw_walls(dest: &web_sys::CanvasRenderingContext2d, camera: &Camera, level: 
                         + ((wall_height / (texture.height as f32)) * i as f32) as usize,
                     width: SLICE_WIDTH + 1,
                     height: (wall_height / (texture.height as f32)) as usize + 1,
-                    color: texture
+                    color: *texture
                         .get_color(&Point {
                             x: ((cast_results[loop_count].x + cast_results[loop_count].y) * (texture.width as f32)) % (texture.width as f32),
                             y: i as f32,
-                        })
-                        .get_color_from_distance(wall_distance),
+                        }),
                 },
+                wall_distance
             );
         }
         loop_count += 1;
@@ -703,6 +687,9 @@ pub fn start() -> Result<(), JsValue> {
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
         unsafe {
             if GAME_RUNNING {
+                // let mut buffer: Vec<u8> = vec![0; SCREEN_WIDTH * SCREEN_HEIGHT];
+
+
                 draw_background(&game_canvas);
                 draw_walls(&game_canvas, &PLAYER_CAMERA, &current_level);
                 draw_minimap(&game_canvas, &PLAYER_CAMERA, &current_level);
