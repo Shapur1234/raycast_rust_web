@@ -1,15 +1,36 @@
 <html><head>
-    <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+<link rel="preload" href="/index-e790b3d112e9c8b9_bg.wasm" as="fetch" type="application/wasm" crossorigin="">
+<link rel="modulepreload" href="/index-e790b3d112e9c8b9.js"></head><body><html">
 
-<link rel="preload" href="/index-cefa2433c1fa38b3_bg.wasm" as="fetch" type="application/wasm" crossorigin="">
-<link rel="modulepreload" href="/index-cefa2433c1fa38b3.js"></head>
-
-<body style="position: relative;">
-    <canvas id="game_canvas" width="1280" height="760" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);"></canvas>
+    <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="style.css">
     <script type="text/jsx" src="./index.js"></script>
+    <title>Wolfeinstein 2.0</title>
+    <style>
+        .canvas {
+        display: block;
+        margin: auto;
+        }
+        .title {
+        text-align: center;
+        font-size: 2em;
+        padding: 1%;
+        font-family: Century Gothic, sans-serif;
+        }
+        .subtitle {
+        padding: 1px;
+        font-family: Century Gothic, sans-serif;
+        }
+    </style>
 
 
-<script type="module">import init from '/index-cefa2433c1fa38b3.js';init('/index-cefa2433c1fa38b3_bg.wasm');</script><script>(function () {
+    
+    <div>
+        <canvas id="game_canvas" class="canvas"></canvas>
+    </div>
+
+</html"><script type="module">import init from '/index-e790b3d112e9c8b9.js';init('/index-e790b3d112e9c8b9_bg.wasm');</script><script>(function () {
     var url = 'ws://' + window.location.host + '/_trunk/ws';
     var poll_interval = 5000;
     var reload_upon_connect = () => {

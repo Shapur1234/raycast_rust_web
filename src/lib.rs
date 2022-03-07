@@ -71,6 +71,37 @@ impl Rect {
 
 // --------------------------------------------------------------------------------
 
+struct Texture {
+    width: usize,
+    height: usize,
+    layout: Vec<Vec<usize>>,
+    colors: Vec<Color>,
+}
+
+impl Texture {
+    fn new(layout_input: Vec<Vec<usize>>, layout_color: Vec<Color>) -> Texture {
+        Texture {
+            width: layout_input[0].len(),
+            height: layout_input.len(),
+            layout: layout_input,
+            colors: layout_color,
+        }
+    }
+    fn get_color(&self, point: &Point) -> &Color {
+        if (point.x >= 0.0 && point.x < (self.width as f32))
+            && (point.y >= 0.0 && point.y < (self.height as f32))
+        {
+            &self.colors[self.layout[point.y as usize][point.x as usize]]
+        }
+        // TODO FIX
+        else {
+            &self.colors[self.layout[0][0]]
+        }
+    }
+}
+
+// --------------------------------------------------------------------------------
+
 #[derive(Debug, Clone)]
 struct Level {
     layout: Vec<Vec<Tile>>,
@@ -92,7 +123,7 @@ impl Level {
         {
             &self.layout[point.y as usize][point.x as usize]
         }
-        // TO FIX
+        // TODO FIX
         else {
             &self.layout[1][1]
         }
@@ -161,7 +192,7 @@ impl Tile {
             },
             base_color: match &tile_type {
                 TileType::Air => Color::new(0xFF, 0xFF, 0xFF),
-                TileType::Stone => Color::new(0x38, 0x36, 0x30),
+                TileType::Stone => Color::new(0xa0, 0xa0, 0xa0),
                 TileType::Yellow => Color::new(0xCC, 0xFF, 0x00),
             },
         }
@@ -326,26 +357,16 @@ fn draw_not_running(dest: &web_sys::CanvasRenderingContext2d) {
     }
 }
 fn draw_background(dest: &web_sys::CanvasRenderingContext2d) {
-    const BACKGROUND_RECTS: [Rect; 2] = [
+    draw_rect(
+        &dest,
         Rect {
             x: 0,
             y: 0,
             width: SCREEN_WIDTH,
-            height: SCREEN_HEIGHT / 2,
-            color: 0x0000ffff,
+            height: SCREEN_HEIGHT,
+            color: 0x00202020,
         },
-        Rect {
-            x: 0,
-            y: SCREEN_HEIGHT / 2,
-            width: SCREEN_WIDTH,
-            height: SCREEN_HEIGHT / 2,
-            color: 0x008b4513,
-        },
-    ];
-
-    for rect in BACKGROUND_RECTS {
-        draw_rect(&dest, rect);
-    }
+    )
 }
 fn draw_minimap(dest: &web_sys::CanvasRenderingContext2d, camera: &Camera, level: &Level) {
     const TILE_SIZE: usize = 16;
@@ -399,13 +420,66 @@ fn draw_minimap(dest: &web_sys::CanvasRenderingContext2d, camera: &Camera, level
         );
     }
 }
+// fn draw_walls(dest: &web_sys::CanvasRenderingContext2d, camera: &Camera, level: &Level) {
+//     const SLICE_WIDTH: usize = SCREEN_WIDTH / (FOV * INTERNAL_RESOLUTION_MULTIPLIER) as usize;
+//     let mut wall_distances: Vec<f32> = vec![];
+//     let mut wall_base_colors: Vec<&Color> = vec![];
+
+//     for angle in camera.get_angles_to_cast() {
+//         let cast_result: Point = cast_ray(&camera.pos, &angle, &level);
+//         wall_distances.push(calc_distance_between_points(&camera.pos, &cast_result));
+//         wall_base_colors.push(&level.get_tile(&cast_result).base_color)
+//     }
+
+//     let mut loop_count: usize = 0;
+//     for wall_distance in wall_distances {
+//         let wall_height: f32 = (SCREEN_HEIGHT as f32 * 0.8) / wall_distance;
+
+//         draw_rect(
+//             dest,
+//             Rect {
+//                 x: SLICE_WIDTH * loop_count,
+//                 y: ((SCREEN_HEIGHT as f32 / 2.0) - (wall_height / 2.0)) as usize,
+//                 width: SLICE_WIDTH + 1,
+//                 height: wall_height as usize,
+//                 color: wall_base_colors[loop_count].get_color_from_distance(wall_distance),
+//             },
+//         );
+//         loop_count += 1;
+//     }
+// }
 fn draw_walls(dest: &web_sys::CanvasRenderingContext2d, camera: &Camera, level: &Level) {
+    let texture = Texture::new(
+        vec![
+            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        ],
+        vec![Color::new(205, 84, 75), Color::new(123, 46, 47)],
+    );
     const SLICE_WIDTH: usize = SCREEN_WIDTH / (FOV * INTERNAL_RESOLUTION_MULTIPLIER) as usize;
     let mut wall_distances: Vec<f32> = vec![];
     let mut wall_base_colors: Vec<&Color> = vec![];
-
+    let mut cast_results: Vec<Point> = vec![];
+    
     for angle in camera.get_angles_to_cast() {
-        let cast_result: Point = cast_ray(&camera.pos, &angle, &level);
+        cast_results.push(cast_ray(&camera.pos, &angle, &level));
+    }
+
+    for cast_result in &cast_results {
         wall_distances.push(calc_distance_between_points(&camera.pos, &cast_result));
         wall_base_colors.push(&level.get_tile(&cast_result).base_color)
     }
@@ -413,16 +487,24 @@ fn draw_walls(dest: &web_sys::CanvasRenderingContext2d, camera: &Camera, level: 
     let mut loop_count: usize = 0;
     for wall_distance in wall_distances {
         let wall_height: f32 = (SCREEN_HEIGHT as f32 * 0.8) / wall_distance;
-
-        let mut rect_to_draw: Rect = Rect {
-            x: SLICE_WIDTH * loop_count,
-            y: ((SCREEN_HEIGHT as f32 / 2.0) - (wall_height / 2.0)) as usize,
-            width: SLICE_WIDTH + 1,
-            height: wall_height as usize,
-            color: wall_base_colors[loop_count].get_color_from_distance(wall_distance),
-        };
-        rect_to_draw.fit_self_to_screen();
-        draw_rect(dest, rect_to_draw);
+        for i in 0..texture.height - 1 {
+            draw_rect(
+                dest,
+                Rect {
+                    x: SLICE_WIDTH * loop_count,
+                    y: ((SCREEN_HEIGHT as f32 - wall_height) / 2.0) as usize
+                        + ((wall_height / (texture.height as f32)) * i as f32) as usize,
+                    width: SLICE_WIDTH + 1,
+                    height: (wall_height / (texture.height as f32)) as usize + 1,
+                    color: texture
+                        .get_color(&Point {
+                            x: ((cast_results[loop_count].x + cast_results[loop_count].y) * (texture.width as f32)) % (texture.width as f32),
+                            y: i as f32,
+                        })
+                        .get_color_from_distance(wall_distance),
+                },
+            );
+        }
         loop_count += 1;
     }
 }
@@ -502,7 +584,7 @@ pub fn start() -> Result<(), JsValue> {
         vec![
             Tile::new(TileType::Stone),
             Tile::new(TileType::Air),
-            Tile::new(TileType::Yellow),
+            Tile::new(TileType::Stone),
             Tile::new(TileType::Air),
             Tile::new(TileType::Air),
             Tile::new(TileType::Stone),
