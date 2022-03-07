@@ -615,6 +615,23 @@ pub fn start() -> Result<(), JsValue> {
         )?;
         closure.forget();
     }
+    // Pointerlock error
+    {
+        let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| unsafe {
+            false;
+            GAME_RUNNING = false;
+            console_log!(
+                "GAME_RUNNING: {:?},  POINTER_LOCK: {:?}",
+                GAME_RUNNING,
+                POINTER_SHOULD_BE_LOCKED
+            );
+        }) as Box<dyn FnMut(_)>);
+        document.add_event_listener_with_callback(
+            "pointerlockerror",
+            closure.as_ref().unchecked_ref(),
+        )?;
+        closure.forget();
+    }
     // Game loop
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
         unsafe {
