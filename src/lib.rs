@@ -585,11 +585,6 @@ pub fn start() -> Result<(), JsValue> {
                 GAME_RUNNING = true;
                 POINTER_SHOULD_BE_LOCKED = true;
             }
-            console_log!(
-                "GAME_RUNNING: {:?},  POINTER_LOCK: {:?}",
-                GAME_RUNNING,
-                POINTER_SHOULD_BE_LOCKED
-            );
         }) as Box<dyn FnMut(_)>);
         game_cavas_html
             .add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())?;
@@ -603,11 +598,6 @@ pub fn start() -> Result<(), JsValue> {
             } else {
                 GAME_RUNNING = false;
             }
-            console_log!(
-                "GAME_RUNNING: {:?},  POINTER_LOCK: {:?}",
-                GAME_RUNNING,
-                POINTER_SHOULD_BE_LOCKED
-            );
         }) as Box<dyn FnMut(_)>);
         document.add_event_listener_with_callback(
             "pointerlockchange",
@@ -620,11 +610,6 @@ pub fn start() -> Result<(), JsValue> {
         let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| unsafe {
             false;
             GAME_RUNNING = false;
-            console_log!(
-                "GAME_RUNNING: {:?},  POINTER_LOCK: {:?}",
-                GAME_RUNNING,
-                POINTER_SHOULD_BE_LOCKED
-            );
         }) as Box<dyn FnMut(_)>);
         document.add_event_listener_with_callback(
             "pointerlockerror",
