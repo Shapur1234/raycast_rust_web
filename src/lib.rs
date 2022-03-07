@@ -6,11 +6,12 @@ use wasm_bindgen::JsCast;
 const SCREEN_WIDTH: usize = 1280;
 const SCREEN_HEIGHT: usize = 760;
 const FOV: u32 = 80;
-const LOOK_SPEED_MODIFIER: f32 = 0.5;
 const MOVEMENT_SPEED_MODIFIER: f32 = 0.05;
 const INTERNAL_RESOLUTION_MULTIPLIER: u32 = 16;
 
-static mut player_camera: Camera = Camera {
+static mut GAME_RUNNING: bool = false;
+static mut POINTER_SHOULD_BE_LOCKED: bool = false;
+static mut PLAYER_CAMERA: Camera = Camera {
     pos: Point { x: 1.5, y: 1.5 },
     rotation: Rotation { degree: 0.0 },
 };
@@ -311,6 +312,19 @@ fn draw_rect(dest: &web_sys::CanvasRenderingContext2d, rect: Rect) {
         rect.height as f64,
     )
 }
+fn draw_not_running(dest: &web_sys::CanvasRenderingContext2d) {
+    const NOT_RUNNING_RECTS: [Rect; 1] = [Rect {
+        x: 0,
+        y: 0,
+        width: SCREEN_WIDTH,
+        height: SCREEN_HEIGHT,
+        color: 0x00000000,
+    }];
+
+    for rect in NOT_RUNNING_RECTS {
+        draw_rect(&dest, rect);
+    }
+}
 fn draw_background(dest: &web_sys::CanvasRenderingContext2d) {
     const BACKGROUND_RECTS: [Rect; 2] = [
         Rect {
@@ -465,6 +479,9 @@ pub fn start() -> Result<(), JsValue> {
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .unwrap();
 
+    game_cavas_html.set_width(SCREEN_WIDTH as u32);
+    game_cavas_html.set_height(SCREEN_HEIGHT as u32);
+
     let current_level: Level = Level::new(vec![
         vec![
             Tile::new(TileType::Stone),
@@ -520,18 +537,20 @@ pub fn start() -> Result<(), JsValue> {
     {
         let current_level_2 = current_level.clone();
         let closure = Closure::wrap(Box::new(move |event: web_sys::KeyboardEvent| unsafe {
-            let pressed_key = event.key_code();
-            player_camera.update_from_input(
-                &current_level_2,
-                InputInfo {
-                    forward: if pressed_key == 87 { true } else { false },
-                    backward: if pressed_key == 83 { true } else { false },
-                    right: if pressed_key == 68 { true } else { false },
-                    left: if pressed_key == 65 { true } else { false },
-                    rot_right: if pressed_key == 69 { true } else { false },
-                    rot_left: if pressed_key == 81 { true } else { false },
-                },
-            );
+            if GAME_RUNNING {
+                let pressed_key = event.key_code();
+                PLAYER_CAMERA.update_from_input(
+                    &current_level_2,
+                    InputInfo {
+                        forward: if pressed_key == 87 { true } else { false },
+                        backward: if pressed_key == 83 { true } else { false },
+                        right: if pressed_key == 68 { true } else { false },
+                        left: if pressed_key == 65 { true } else { false },
+                        rot_right: if pressed_key == 69 { true } else { false },
+                        rot_left: if pressed_key == 81 { true } else { false },
+                    },
+                );
+            }
         }) as Box<dyn FnMut(_)>);
         window.add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())?;
         closure.forget();
@@ -539,19 +558,75 @@ pub fn start() -> Result<(), JsValue> {
     // Mouse input
     {
         let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| unsafe {
-            player_camera.rotation.degree += ((event.movement_x() * 10) as f32) * MOVEMENT_SPEED_MODIFIER;
+            if GAME_RUNNING {
+                PLAYER_CAMERA.rotation.degree +=
+                    ((event.movement_x() * 10) as f32) * MOVEMENT_SPEED_MODIFIER;
+            }
         }) as Box<dyn FnMut(_)>);
-        game_cavas_html.add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())?;
+        game_cavas_html
+            .add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())?;
         closure.forget();
     }
+    // Mouse click
+    {
+        let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| unsafe {
+            if !GAME_RUNNING {
+                web_sys::window()
+                    .unwrap()
+                    .document()
+                    .unwrap()
+                    .get_element_by_id("game_canvas")
+                    .unwrap()
+                    .dyn_into::<web_sys::HtmlCanvasElement>()
+                    .map_err(|_| ())
+                    .unwrap()
+                    .request_pointer_lock();
 
+                GAME_RUNNING = true;
+                POINTER_SHOULD_BE_LOCKED = true;
+            }
+            console_log!(
+                "GAME_RUNNING: {:?},  POINTER_LOCK: {:?}",
+                GAME_RUNNING,
+                POINTER_SHOULD_BE_LOCKED
+            );
+        }) as Box<dyn FnMut(_)>);
+        game_cavas_html
+            .add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())?;
+        closure.forget();
+    }
+    // Pointerlock exit
+    {
+        let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| unsafe {
+            if POINTER_SHOULD_BE_LOCKED {
+                POINTER_SHOULD_BE_LOCKED = false;
+            } else {
+                GAME_RUNNING = false;
+            }
+            console_log!(
+                "GAME_RUNNING: {:?},  POINTER_LOCK: {:?}",
+                GAME_RUNNING,
+                POINTER_SHOULD_BE_LOCKED
+            );
+        }) as Box<dyn FnMut(_)>);
+        document.add_event_listener_with_callback(
+            "pointerlockchange",
+            closure.as_ref().unchecked_ref(),
+        )?;
+        closure.forget();
+    }
     // Game loop
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
-        draw_background(&game_canvas);
         unsafe {
-            draw_walls(&game_canvas, &player_camera, &current_level);
-            draw_minimap(&game_canvas, &player_camera, &current_level);
+            if GAME_RUNNING {
+                draw_background(&game_canvas);
+                draw_walls(&game_canvas, &PLAYER_CAMERA, &current_level);
+                draw_minimap(&game_canvas, &PLAYER_CAMERA, &current_level);
+            } else {
+                draw_not_running(&game_canvas);
+            }
         }
+
         request_animation_frame(f.borrow().as_ref().unwrap());
     }) as Box<dyn FnMut()>));
 

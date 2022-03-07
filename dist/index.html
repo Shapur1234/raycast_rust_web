@@ -1,24 +1,15 @@
 <html><head>
     <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
 
-<link rel="preload" href="/index-1d3d3fbc350aaab5_bg.wasm" as="fetch" type="application/wasm" crossorigin="">
-<link rel="modulepreload" href="/index-1d3d3fbc350aaab5.js"></head>
+<link rel="preload" href="/index-ddc24ec0bf3ee1a9_bg.wasm" as="fetch" type="application/wasm" crossorigin="">
+<link rel="modulepreload" href="/index-ddc24ec0bf3ee1a9.js"></head>
 
 <body style="position: relative;">
     <canvas id="game_canvas" width="1280" height="760" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);"></canvas>
     <script type="text/jsx" src="./index.js"></script>
-    <script>
-      let canvas = document.querySelector("canvas")
-      canvas.requestPointerLock = canvas.requestPointerLock || canvas.mozRequestPointerLock;
-      document.exitPointerLock = document.exitPointerLock || document.mozExitPointerLock;
-
-      canvas.onclick = function() {
-        canvas.requestPointerLock();
-      }
-    </script>
 
 
-<script type="module">import init from '/index-1d3d3fbc350aaab5.js';init('/index-1d3d3fbc350aaab5_bg.wasm');</script><script>(function () {
+<script type="module">import init from '/index-ddc24ec0bf3ee1a9.js';init('/index-ddc24ec0bf3ee1a9_bg.wasm');</script><script>(function () {
     var url = 'ws://' + window.location.host + '/_trunk/ws';
     var poll_interval = 5000;
     var reload_upon_connect = () => {
