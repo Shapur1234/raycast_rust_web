@@ -8,6 +8,7 @@ const SCREEN_HEIGHT: usize = 760;
 const FOV: u32 = 80;
 const MOVEMENT_SPEED_MODIFIER: f32 = 0.05;
 const INTERNAL_RESOLUTION_MULTIPLIER: u32 = 16;
+const RENDER_DISTANCE: f32 = 10.0;
 
 static mut GAME_RUNNING: bool = false;
 static mut POINTER_SHOULD_BE_LOCKED: bool = false;
@@ -71,6 +72,7 @@ impl Rect {
 
 // --------------------------------------------------------------------------------
 
+#[derive(Debug, Clone)]
 struct Texture {
     width: usize,
     height: usize,
@@ -104,29 +106,35 @@ impl Texture {
 
 #[derive(Debug, Clone)]
 struct Level {
-    layout: Vec<Vec<Tile>>,
+    layout: Vec<Vec<u8>>,
+    all_tiles: Vec<Tile>,
+    all_textures: Vec<Texture>,
     width: usize,
     height: usize,
 }
 
 impl Level {
-    fn new(layout_input: Vec<Vec<Tile>>) -> Level {
+    fn new(layout: Vec<Vec<u8>>, all_tiles: Vec<Tile>, all_textures: Vec<Texture>) -> Level {
+        console_log!("{:?}", layout);
         Level {
-            width: layout_input[0].len(),
-            height: layout_input.len(),
-            layout: layout_input,
+            width: layout[0].len(),
+            height: layout.len(),
+            layout: layout,
+            all_tiles: all_tiles,
+            all_textures: all_textures,
         }
     }
     fn get_tile(&self, point: &Point) -> &Tile {
         if (point.x >= 0.0 && point.x < (self.width as f32))
             && (point.y >= 0.0 && point.y < (self.height as f32))
         {
-            &self.layout[point.y as usize][point.x as usize]
+            &self.all_tiles[self.layout[point.y as usize][point.x as usize] as usize]
+        } else {
+            &self.all_tiles[0]
         }
-        // TODO FIX
-        else {
-            &self.layout[1][1]
-        }
+    }
+    fn get_texture(&self, point: &Point) -> &Texture {
+        &self.all_textures[self.get_tile(point).texture_index as usize]
     }
     fn is_in_level(&self, point: &Point) -> bool {
         if (point.x < 0.0 || point.x > self.width as f32)
@@ -173,33 +181,22 @@ impl Color {
 
 enum TileType {
     Air,
-    Stone,
-    Yellow,
+    Brick,
 }
 
 #[derive(Debug, Clone)]
 struct Tile {
     solid: bool,
     transparent: bool,
-    base_color: Color,
+    texture_index: u8,
 }
 
 impl Tile {
-    fn new(tile_type: TileType) -> Tile {
+    fn new(texture_index: u8, solid: bool, transparent: bool) -> Tile {
         Tile {
-            solid: match &tile_type {
-                TileType::Air => false,
-                _other => true,
-            },
-            transparent: match &tile_type {
-                TileType::Air => false,
-                _other => true,
-            },
-            base_color: match &tile_type {
-                TileType::Air => Color::new(0xFF, 0xFF, 0xFF),
-                TileType::Stone => Color::new(0xa0, 0xa0, 0xa0),
-                TileType::Yellow => Color::new(0xCC, 0xFF, 0x00),
-            },
+            texture_index: texture_index,
+            solid: solid,
+            transparent: transparent,
         }
     }
 }
@@ -401,7 +398,7 @@ fn draw_minimap(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
                     y: (y + 1) * TILE_SIZE,
                     width: TILE_SIZE,
                     height: TILE_SIZE,
-                    color: level.get_tile(&Point::new(x as f32, y as f32)).base_color,
+                    color: Color::new(0, 200, 0),
                 },
             );
         }
@@ -439,30 +436,8 @@ fn draw_minimap(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
     }
 }
 fn draw_walls_to_buffer(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
-    let texture = Texture::new(
-        vec![
-            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-            vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-            vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        ],
-        vec![Color::new(205, 84, 75), Color::new(123, 46, 47)],
-    );
     const SLICE_WIDTH: usize = SCREEN_WIDTH / (FOV * INTERNAL_RESOLUTION_MULTIPLIER) as usize;
     let mut wall_distances: Vec<f32> = vec![];
-    let mut wall_base_colors: Vec<&Color> = vec![];
     let mut cast_results: Vec<Point> = vec![];
 
     for angle in camera.get_angles_to_cast() {
@@ -471,30 +446,32 @@ fn draw_walls_to_buffer(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
 
     for cast_result in &cast_results {
         wall_distances.push(calc_distance_between_points(&camera.pos, &cast_result));
-        wall_base_colors.push(&level.get_tile(&cast_result).base_color)
     }
 
     let mut loop_count: usize = 0;
     for wall_distance in wall_distances {
-        let wall_height: f32 = (SCREEN_HEIGHT as f32 * 0.8) / wall_distance;
-        for i in 0..texture.height - 1 {
-            draw_rect_to_buffer_distanced(
-                dest,
-                &mut Rect {
-                    x: SLICE_WIDTH * loop_count,
-                    y: ((SCREEN_HEIGHT as f32 - wall_height) / 2.0) as usize
-                        + ((wall_height / (texture.height as f32)) * i as f32) as usize,
-                    width: SLICE_WIDTH + 1,
-                    height: (wall_height / (texture.height as f32)) as usize + 1,
-                    color: *texture.get_color(&Point {
-                        x: ((cast_results[loop_count].x + cast_results[loop_count].y)
-                            * (texture.width as f32))
-                            % (texture.width as f32),
-                        y: i as f32,
-                    }),
-                },
-                wall_distance,
-            );
+        if !level.get_tile(&cast_results[loop_count]).transparent {
+            let wall_height: f32 = (SCREEN_HEIGHT as f32 * 0.8) / wall_distance;
+            let texture: &Texture = level.get_texture(&cast_results[loop_count]);
+            for i in 0..texture.height - 1 {
+                draw_rect_to_buffer_distanced(
+                    dest,
+                    &mut Rect {
+                        x: SLICE_WIDTH * loop_count,
+                        y: ((SCREEN_HEIGHT as f32 - wall_height) / 2.0) as usize
+                            + ((wall_height / (texture.height as f32)) * i as f32) as usize,
+                        width: SLICE_WIDTH + 1,
+                        height: (wall_height / (texture.height as f32)) as usize + 1,
+                        color: *texture.get_color(&Point {
+                            x: ((cast_results[loop_count].x + cast_results[loop_count].y)
+                                * (texture.width as f32))
+                                % (texture.width as f32),
+                            y: i as f32,
+                        }),
+                    },
+                    wall_distance,
+                );
+            }
         }
         loop_count += 1;
     }
@@ -503,20 +480,19 @@ fn calc_distance_between_points(point1: &Point, point2: &Point) -> f32 {
     ((point1.x - point2.x).powf(2.0) + (point1.y - point2.y).powf(2.0)).powf(0.5)
 }
 fn cast_ray(pos: &Point, rotation: &Rotation, level: &Level) -> Point {
-    const MAX_DISTANCE: f32 = 10.0;
     const STEP: f32 = 0.01;
 
     let mut distance_travelled: f32 = 0.0;
     let mut point_to_check = Point::new(pos.x, pos.y);
     let mut has_hit: bool = false;
-    while distance_travelled.abs() < MAX_DISTANCE {
+    while distance_travelled.abs() < RENDER_DISTANCE {
         distance_travelled += STEP;
 
         point_to_check = Point::new(
             pos.x + (distance_travelled * rotation.to_rad().cos()),
             pos.y + (distance_travelled * rotation.to_rad().sin()),
         );
-        if level.get_tile(&point_to_check).transparent {
+        if !level.get_tile(&point_to_check).transparent {
             has_hit = true;
             break;
         }
@@ -566,56 +542,93 @@ pub fn start() -> Result<(), JsValue> {
     game_cavas_html.set_width(SCREEN_WIDTH as u32);
     game_cavas_html.set_height(SCREEN_HEIGHT as u32);
 
-    let current_level: Level = Level::new(vec![
+    // let current_level: Level = Level::new(vec![
+    //     vec![
+    //         Tile::new(TileType::Stone),
+    //         Tile::new(TileType::Stone),
+    //         Tile::new(TileType::Air),
+    //         Tile::new(TileType::Stone),
+    //         Tile::new(TileType::Stone),
+    //         Tile::new(TileType::Stone),
+    //     ],
+    //     vec![
+    //         Tile::new(TileType::Stone),
+    //         Tile::new(TileType::Air),
+    //         Tile::new(TileType::Air),
+    //         Tile::new(TileType::Air),
+    //         Tile::new(TileType::Air),
+    //         Tile::new(TileType::Stone),
+    //     ],
+    //     vec![
+    //         Tile::new(TileType::Stone),
+    //         Tile::new(TileType::Air),
+    //         Tile::new(TileType::Stone),
+    //         Tile::new(TileType::Air),
+    //         Tile::new(TileType::Air),
+    //         Tile::new(TileType::Stone),
+    //     ],
+    //     vec![
+    //         Tile::new(TileType::Stone),
+    //         Tile::new(TileType::Air),
+    //         Tile::new(TileType::Air),
+    //         Tile::new(TileType::Air),
+    //         Tile::new(TileType::Air),
+    //         Tile::new(TileType::Stone),
+    //     ],
+    //     vec![
+    //         Tile::new(TileType::Stone),
+    //         Tile::new(TileType::Stone),
+    //         Tile::new(TileType::Air),
+    //         Tile::new(TileType::Stone),
+    //         Tile::new(TileType::Stone),
+    //         Tile::new(TileType::Stone),
+    //     ],
+    //     vec![
+    //         Tile::new(TileType::Stone),
+    //         Tile::new(TileType::Stone),
+    //         Tile::new(TileType::Stone),
+    //         Tile::new(TileType::Stone),
+    //         Tile::new(TileType::Stone),
+    //         Tile::new(TileType::Stone),
+    //     ],
+    // ]);
+    let current_level = Level::new(
         vec![
-            Tile::new(TileType::Stone),
-            Tile::new(TileType::Stone),
-            Tile::new(TileType::Air),
-            Tile::new(TileType::Stone),
-            Tile::new(TileType::Stone),
-            Tile::new(TileType::Stone),
+            vec![1, 1, 1, 1, 1],
+            vec![1, 0, 0, 0, 1],
+            vec![1, 0, 1, 0, 1],
+            vec![1, 0, 0, 0, 1],
+            vec![1, 1, 0, 1, 1],
         ],
+        vec![Tile::new(0, false, true), Tile::new(1, true, false)],
         vec![
-            Tile::new(TileType::Stone),
-            Tile::new(TileType::Air),
-            Tile::new(TileType::Air),
-            Tile::new(TileType::Air),
-            Tile::new(TileType::Air),
-            Tile::new(TileType::Stone),
+            Texture::new(
+                vec![vec![0, 0], vec![0, 0]],
+                vec![Color::new(255, 255, 255)],
+            ),
+            Texture::new(
+                vec![
+                    vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+                    vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+                    vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+                    vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+                    vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+                    vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+                    vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+                    vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+                    vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+                    vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+                    vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+                    vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
+                    vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                ],
+                vec![Color::new(205, 84, 75), Color::new(123, 46, 47)],
+            ),
         ],
-        vec![
-            Tile::new(TileType::Stone),
-            Tile::new(TileType::Air),
-            Tile::new(TileType::Stone),
-            Tile::new(TileType::Air),
-            Tile::new(TileType::Air),
-            Tile::new(TileType::Stone),
-        ],
-        vec![
-            Tile::new(TileType::Stone),
-            Tile::new(TileType::Air),
-            Tile::new(TileType::Air),
-            Tile::new(TileType::Air),
-            Tile::new(TileType::Air),
-            Tile::new(TileType::Stone),
-        ],
-        vec![
-            Tile::new(TileType::Stone),
-            Tile::new(TileType::Stone),
-            Tile::new(TileType::Air),
-            Tile::new(TileType::Stone),
-            Tile::new(TileType::Stone),
-            Tile::new(TileType::Stone),
-        ],
-        vec![
-            Tile::new(TileType::Stone),
-            Tile::new(TileType::Stone),
-            Tile::new(TileType::Stone),
-            Tile::new(TileType::Stone),
-            Tile::new(TileType::Stone),
-            Tile::new(TileType::Stone),
-        ],
-    ]);
+    );
 
     // Keyboard input
     {
