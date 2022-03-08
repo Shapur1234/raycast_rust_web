@@ -115,7 +115,6 @@ struct Level {
 
 impl Level {
     fn new(layout: Vec<Vec<u8>>, all_tiles: Vec<Tile>, all_textures: Vec<Texture>) -> Level {
-        console_log!("{:?}", layout);
         Level {
             width: layout[0].len(),
             height: layout.len(),
@@ -162,26 +161,11 @@ impl Color {
             b: blue,
         }
     }
-    fn get_color_from_distance(&self, distance: f32) -> u32 {
-        rgb_to_u32(
-            ((self.r as f32 / (distance * 0.6)) as u8).clamp(self.r / 10, self.r),
-            ((self.g as f32 / (distance * 0.6)) as u8).clamp(self.g / 10, self.g),
-            ((self.b as f32 / (distance * 0.6)) as u8).clamp(self.b / 10, self.b),
-        )
-    }
     fn distance_self(&mut self, distance: f32) {
         self.r = ((self.r as f32 / (distance * 0.6)) as u8).clamp(self.r / 10, self.r);
         self.g = ((self.g as f32 / (distance * 0.6)) as u8).clamp(self.g / 10, self.g);
         self.b = ((self.b as f32 / (distance * 0.6)) as u8).clamp(self.b / 10, self.b);
     }
-    fn to_u32(&self) -> u32 {
-        rgb_to_u32(self.r, self.g, self.b)
-    }
-}
-
-enum TileType {
-    Air,
-    Brick,
 }
 
 #[derive(Debug, Clone)]
@@ -336,15 +320,6 @@ impl Point {
 
 // --------------------------------------------------------------------------------
 
-fn draw_rect(dest: &web_sys::CanvasRenderingContext2d, rect: Rect) {
-    dest.set_fill_style(&JsValue::from_str(&format!("#{:06x}", rect.color.to_u32())));
-    dest.fill_rect(
-        rect.x as f64,
-        rect.y as f64,
-        rect.width as f64,
-        rect.height as f64,
-    )
-}
 fn draw_rect_to_buffer(dest: &mut Vec<u8>, rect: &mut Rect) {
     rect.fit_self_to_screen();
     for y in 0..rect.height {
@@ -360,19 +335,6 @@ fn draw_rect_to_buffer(dest: &mut Vec<u8>, rect: &mut Rect) {
 fn draw_rect_to_buffer_distanced(dest: &mut Vec<u8>, rect: &mut Rect, distance: f32) {
     rect.color.distance_self(distance);
     draw_rect_to_buffer(dest, rect);
-}
-fn draw_not_running(dest: &web_sys::CanvasRenderingContext2d) {
-    const NOT_RUNNING_RECTS: [Rect; 1] = [Rect {
-        x: 0,
-        y: 0,
-        width: SCREEN_WIDTH,
-        height: SCREEN_HEIGHT,
-        color: Color { r: 0, g: 0, b: 0 },
-    }];
-
-    for rect in NOT_RUNNING_RECTS {
-        draw_rect(&dest, rect);
-    }
 }
 fn draw_background(dest: &mut Vec<u8>) {
     draw_rect_to_buffer(
@@ -391,6 +353,9 @@ fn draw_minimap(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
 
     for y in 0..level.height {
         for x in 0..level.width {
+            let tile_pos = &Point::new(x as f32, y as f32);
+            let tile = level.get_tile(tile_pos);
+            let texture = level.get_texture(tile_pos);
             draw_rect_to_buffer(
                 dest,
                 &mut Rect {
@@ -398,7 +363,11 @@ fn draw_minimap(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
                     y: (y + 1) * TILE_SIZE,
                     width: TILE_SIZE,
                     height: TILE_SIZE,
-                    color: Color::new(0, 200, 0),
+                    color: if !tile.transparent {
+                        texture.colors[0]
+                    } else {
+                        Color::new(255, 255, 255)
+                    },
                 },
             );
         }
@@ -451,9 +420,9 @@ fn draw_walls_to_buffer(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
     let mut loop_count: usize = 0;
     for wall_distance in wall_distances {
         if !level.get_tile(&cast_results[loop_count]).transparent {
-            let wall_height: f32 = (SCREEN_HEIGHT as f32 * 0.8) / wall_distance;
+            let wall_height: f32 = SCREEN_HEIGHT as f32 * 0.8 / wall_distance;
             let texture: &Texture = level.get_texture(&cast_results[loop_count]);
-            for i in 0..texture.height - 1 {
+            for i in 0..texture.height {
                 draw_rect_to_buffer_distanced(
                     dest,
                     &mut Rect {
@@ -542,65 +511,22 @@ pub fn start() -> Result<(), JsValue> {
     game_cavas_html.set_width(SCREEN_WIDTH as u32);
     game_cavas_html.set_height(SCREEN_HEIGHT as u32);
 
-    // let current_level: Level = Level::new(vec![
-    //     vec![
-    //         Tile::new(TileType::Stone),
-    //         Tile::new(TileType::Stone),
-    //         Tile::new(TileType::Air),
-    //         Tile::new(TileType::Stone),
-    //         Tile::new(TileType::Stone),
-    //         Tile::new(TileType::Stone),
-    //     ],
-    //     vec![
-    //         Tile::new(TileType::Stone),
-    //         Tile::new(TileType::Air),
-    //         Tile::new(TileType::Air),
-    //         Tile::new(TileType::Air),
-    //         Tile::new(TileType::Air),
-    //         Tile::new(TileType::Stone),
-    //     ],
-    //     vec![
-    //         Tile::new(TileType::Stone),
-    //         Tile::new(TileType::Air),
-    //         Tile::new(TileType::Stone),
-    //         Tile::new(TileType::Air),
-    //         Tile::new(TileType::Air),
-    //         Tile::new(TileType::Stone),
-    //     ],
-    //     vec![
-    //         Tile::new(TileType::Stone),
-    //         Tile::new(TileType::Air),
-    //         Tile::new(TileType::Air),
-    //         Tile::new(TileType::Air),
-    //         Tile::new(TileType::Air),
-    //         Tile::new(TileType::Stone),
-    //     ],
-    //     vec![
-    //         Tile::new(TileType::Stone),
-    //         Tile::new(TileType::Stone),
-    //         Tile::new(TileType::Air),
-    //         Tile::new(TileType::Stone),
-    //         Tile::new(TileType::Stone),
-    //         Tile::new(TileType::Stone),
-    //     ],
-    //     vec![
-    //         Tile::new(TileType::Stone),
-    //         Tile::new(TileType::Stone),
-    //         Tile::new(TileType::Stone),
-    //         Tile::new(TileType::Stone),
-    //         Tile::new(TileType::Stone),
-    //         Tile::new(TileType::Stone),
-    //     ],
-    // ]);
     let current_level = Level::new(
         vec![
-            vec![1, 1, 1, 1, 1],
-            vec![1, 0, 0, 0, 1],
-            vec![1, 0, 1, 0, 1],
-            vec![1, 0, 0, 0, 1],
-            vec![1, 1, 0, 1, 1],
+            vec![1, 1, 1, 0, 1, 1, 1],
+            vec![1, 0, 0, 0, 0, 0, 1],
+            vec![1, 1, 2, 0, 2, 1, 1],
+            vec![1, 0, 0, 0, 1, 0, 1],
+            vec![1, 0, 1, 0, 0, 0, 1],
+            vec![1, 1, 2, 0, 2, 1, 1],
+            vec![1, 0, 0, 0, 0, 0, 1],
+            vec![1, 1, 1, 0, 1, 1, 1],
         ],
-        vec![Tile::new(0, false, true), Tile::new(1, true, false)],
+        vec![
+            Tile::new(0, false, true),
+            Tile::new(1, true, false),
+            Tile::new(2, true, false),
+        ],
         vec![
             Texture::new(
                 vec![vec![0, 0], vec![0, 0]],
@@ -626,6 +552,27 @@ pub fn start() -> Result<(), JsValue> {
                     vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
                 ],
                 vec![Color::new(205, 84, 75), Color::new(123, 46, 47)],
+            ),
+            Texture::new(
+                vec![
+                    vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                    vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                ],
+                vec![Color::new(255, 239, 47), Color::new(0, 0, 255)],
             ),
         ],
     );
@@ -727,8 +674,6 @@ pub fn start() -> Result<(), JsValue> {
 
                     draw_buffer_to_canvas(buffer, &game_canvas);
                 }
-            } else {
-                draw_not_running(&game_canvas);
             }
         }
         request_animation_frame(f.borrow().as_ref().unwrap());
