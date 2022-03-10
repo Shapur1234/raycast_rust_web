@@ -3,12 +3,12 @@ use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
-const SCREEN_WIDTH: usize = 1280;
-const SCREEN_HEIGHT: usize = 760;
-const FOV: u32 = 80;
+const SCREEN_WIDTH: usize = 1920;
+const SCREEN_HEIGHT: usize = 1080;
+const FOV: f32 = 80.0;
 const MOVEMENT_SPEED_MODIFIER: f32 = 0.05;
 const INTERNAL_RESOLUTION_MULTIPLIER: u32 = 16;
-const RENDER_DISTANCE: f32 = 10.0;
+const RENDER_DISTANCE: f32 = 20.0;
 
 static mut GAME_RUNNING: bool = false;
 static mut POINTER_SHOULD_BE_LOCKED: bool = false;
@@ -212,8 +212,8 @@ impl Camera {
     }
     fn get_angles_to_cast(&self) -> Vec<Rotation> {
         let mut output: Vec<Rotation> = Vec::new();
-        for i in ((self.rotation.degree as i32) - ((FOV / 2) as i32))
-            ..((self.rotation.degree as i32) + ((FOV / 2) as i32))
+        for i in (self.rotation.degree - (FOV / 2.0)) as i32
+            ..(self.rotation.degree  + (FOV / 2.0)) as i32
         {
             for x in 0..INTERNAL_RESOLUTION_MULTIPLIER {
                 output.push(Rotation::new(
@@ -405,7 +405,7 @@ fn draw_minimap(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
     }
 }
 fn draw_walls_to_buffer(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
-    const SLICE_WIDTH: usize = SCREEN_WIDTH / (FOV * INTERNAL_RESOLUTION_MULTIPLIER) as usize;
+    const SLICE_WIDTH: f32 = (SCREEN_WIDTH as f32) / ((FOV as f32) *  (INTERNAL_RESOLUTION_MULTIPLIER as f32));
     let mut wall_distances: Vec<f32> = vec![];
     let mut cast_results: Vec<Point> = vec![];
 
@@ -420,16 +420,16 @@ fn draw_walls_to_buffer(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
     let mut loop_count: usize = 0;
     for wall_distance in wall_distances {
         if !level.get_tile(&cast_results[loop_count]).transparent {
-            let wall_height: f32 = SCREEN_HEIGHT as f32 * 0.8 / wall_distance;
+            let wall_height: f32 = SCREEN_HEIGHT as f32 / wall_distance;
             let texture: &Texture = level.get_texture(&cast_results[loop_count]);
             for i in 0..texture.height {
                 draw_rect_to_buffer_distanced(
                     dest,
                     &mut Rect {
-                        x: SLICE_WIDTH * loop_count,
+                        x: (SLICE_WIDTH * (loop_count as f32)) as usize,
                         y: ((SCREEN_HEIGHT as f32 - wall_height) / 2.0) as usize
                             + ((wall_height / (texture.height as f32)) * i as f32) as usize,
-                        width: SLICE_WIDTH + 1,
+                        width: (SLICE_WIDTH + 1.0) as usize,
                         height: (wall_height / (texture.height as f32)) as usize + 1,
                         color: *texture.get_color(&Point {
                             x: ((cast_results[loop_count].x + cast_results[loop_count].y)
@@ -613,7 +613,7 @@ pub fn start() -> Result<(), JsValue> {
     }
     // Mouse click
     {
-        let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| unsafe {
+        let closure = Closure::wrap(Box::new(move |_event: web_sys::MouseEvent| unsafe {
             if !GAME_RUNNING {
                 web_sys::window()
                     .unwrap()
@@ -636,7 +636,7 @@ pub fn start() -> Result<(), JsValue> {
     }
     // Pointerlock exit
     {
-        let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| unsafe {
+        let closure = Closure::wrap(Box::new(move |_event: web_sys::MouseEvent| unsafe {
             if POINTER_SHOULD_BE_LOCKED {
                 POINTER_SHOULD_BE_LOCKED = false;
             } else {
@@ -651,7 +651,7 @@ pub fn start() -> Result<(), JsValue> {
     }
     // Pointerlock error
     {
-        let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| unsafe {
+        let closure = Closure::wrap(Box::new(move |_event: web_sys::MouseEvent| unsafe {
             false;
             GAME_RUNNING = false;
         }) as Box<dyn FnMut(_)>);
@@ -670,7 +670,7 @@ pub fn start() -> Result<(), JsValue> {
 
                     draw_background(&mut buffer);
                     draw_walls_to_buffer(&mut buffer, &PLAYER_CAMERA, &current_level);
-                    draw_minimap(&mut buffer, &PLAYER_CAMERA, &current_level);
+                    // draw_minimap(&mut buffer, &PLAYER_CAMERA, &current_level);
 
                     draw_buffer_to_canvas(buffer, &game_canvas);
                 }
