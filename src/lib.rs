@@ -217,7 +217,7 @@ impl Camera {
         {
             for x in 0..unsafe { RESOLUTION_MULTIPLIER } {
                 output.push(Rotation::new(
-                    i as f32 + (1.0 / unsafe { RESOLUTION_MULTIPLIER } as f32) * x as f32,
+                    (i as f32) + ((1.0 / unsafe { RESOLUTION_MULTIPLIER } as f32) * (x as f32)),
                 ));
             }
         }
@@ -634,12 +634,12 @@ pub fn start() -> Result<(), JsValue> {
 
                 if pressed_key == 100 {
                     FOV -= 1;
-                    FOV = FOV.clamp(1, 180);
+                    FOV = FOV.clamp(4, 180);
                     console_log!("FOV changed to: {:?}", FOV);
                 }
                 else if pressed_key == 101 {
                     FOV += 1;
-                    FOV = FOV.clamp(1, 180);
+                    FOV = FOV.clamp(4, 180);
                     console_log!("FOV changed to: {:?}", FOV);
                 }
             }
