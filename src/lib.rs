@@ -8,7 +8,8 @@ static mut SCREEN_HEIGHT: usize = 0;
 
 static mut MOVEMENT_SPEED_MODIFIER: f32 = 0.05;
 static mut RESOLUTION_MULTIPLIER: u32 = 16;
-static mut FOV: u32 = 90; 
+static mut FOV: u32 = 90;
+static mut FISH_EYE_CORRECTION: bool = true;
 
 static mut GAME_RUNNING: bool = false;
 static mut POINTER_SHOULD_BE_LOCKED: bool = false;
@@ -235,24 +236,28 @@ impl Camera {
         }
 
         if input.forward {
-            x_change += unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.to_rad().cos();
-            y_change += unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.to_rad().sin();
+            x_change +=
+                unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.degree.to_radians().cos();
+            y_change +=
+                unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.degree.to_radians().sin();
         }
         if input.backward {
-            x_change -= unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.to_rad().cos();
-            y_change -= unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.to_rad().sin();
+            x_change -=
+                unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.degree.to_radians().cos();
+            y_change -=
+                unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.degree.to_radians().sin();
         }
         if input.right {
-            x_change +=
-                unsafe { MOVEMENT_SPEED_MODIFIER } * (self.rotation.to_rad() + 1.570796).cos();
-            y_change +=
-                unsafe { MOVEMENT_SPEED_MODIFIER } * (self.rotation.to_rad() + 1.570796).sin();
+            x_change += unsafe { MOVEMENT_SPEED_MODIFIER }
+                * (self.rotation.degree.to_radians() + 1.570796).cos();
+            y_change += unsafe { MOVEMENT_SPEED_MODIFIER }
+                * (self.rotation.degree.to_radians() + 1.570796).sin();
         }
         if input.left {
-            x_change +=
-                unsafe { MOVEMENT_SPEED_MODIFIER } * (self.rotation.to_rad() - 1.570796).cos();
-            y_change +=
-                unsafe { MOVEMENT_SPEED_MODIFIER } * (self.rotation.to_rad() - 1.570796).sin();
+            x_change += unsafe { MOVEMENT_SPEED_MODIFIER }
+                * (self.rotation.degree.to_radians() - 1.570796).cos();
+            y_change += unsafe { MOVEMENT_SPEED_MODIFIER }
+                * (self.rotation.degree.to_radians() - 1.570796).sin();
         }
 
         if !level
@@ -291,9 +296,6 @@ impl Rotation {
     }
     fn mod_value(&mut self, value: f32) {
         self.degree = clamp_degrees(self.degree + value);
-    }
-    fn to_rad(&self) -> f32 {
-        self.degree * (std::f32::consts::PI / 180.0)
     }
 }
 
@@ -392,7 +394,7 @@ fn draw_minimap(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
         );
     }
 
-    let cast_result: Point = cast_ray(&camera.pos, &camera.rotation, level);
+    let cast_result: Point = cast_ray(&camera.pos, &camera.rotation, level).0;
     if level.is_in_level(&cast_result) {
         draw_rect_to_buffer(
             dest,
@@ -411,25 +413,28 @@ fn draw_minimap(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
 fn draw_walls_to_buffer(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
     let slice_width: f32 = (unsafe { SCREEN_WIDTH } as f32)
         / ((unsafe { FOV } as f32) * (unsafe { RESOLUTION_MULTIPLIER } as f32));
-    let mut wall_distances: Vec<f32> = vec![];
-    let mut cast_results: Vec<Point> = vec![];
+    let mut cast_distances: Vec<f32> = vec![];
+    let mut cast_points: Vec<Point> = vec![];
 
     let angles: Vec<Rotation> = camera.get_angles_to_cast();
-    let mut i: usize = 0;
     for angle in angles {
-        cast_results.push(cast_ray(&camera.pos, &angle, &level));
-        wall_distances.push(
-            calc_distance_between_points(&camera.pos, &cast_results[i])
-                * (angle.to_rad() - camera.rotation.to_rad()).cos(),
+        let (cast_point, cast_distance) = cast_ray(&camera.pos, &angle, &level);
+        cast_points.push(cast_point);
+        cast_distances.push(
+            cast_distance
+                * if unsafe { FISH_EYE_CORRECTION } {
+                    (angle.degree - camera.rotation.degree).to_radians().cos()
+                } else {
+                    1.0
+                },
         );
-        i += 1;
     }
 
     let mut loop_count: usize = 0;
-    for wall_distance in wall_distances {
-        if !level.get_tile(&cast_results[loop_count]).transparent {
+    for wall_distance in cast_distances {
+        if !level.get_tile(&cast_points[loop_count]).transparent {
             let wall_height: f32 = (unsafe { SCREEN_HEIGHT } as f32) / wall_distance;
-            let texture: &Texture = level.get_texture(&cast_results[loop_count]);
+            let texture: &Texture = level.get_texture(&cast_points[loop_count]);
             for i in 0..texture.height {
                 let vertical_slice_height: f32 = wall_height / (texture.height as f32);
                 draw_rect_to_buffer_distanced(
@@ -446,7 +451,7 @@ fn draw_walls_to_buffer(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
                         width: (slice_width + 1.0) as usize,
                         height: (wall_height / (texture.height as f32)) as usize + 1,
                         color: *texture.get_color(&Point {
-                            x: ((cast_results[loop_count].x + cast_results[loop_count].y)
+                            x: ((cast_points[loop_count].x + cast_points[loop_count].y)
                                 * (texture.width as f32))
                                 % (texture.width as f32),
                             y: i as f32,
@@ -459,11 +464,11 @@ fn draw_walls_to_buffer(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
         loop_count += 1;
     }
 }
-fn calc_distance_between_points(point1: &Point, point2: &Point) -> f32 {
-    ((point1.x - point2.x).powf(2.0) + (point1.y - point2.y).powf(2.0)).powf(0.5)
-}
-fn cast_ray(pos: &Point, rotation: &Rotation, level: &Level) -> Point {
-    let ray_dir: (f32, f32) = (rotation.to_rad().cos(), rotation.to_rad().sin());
+fn cast_ray(pos: &Point, rotation: &Rotation, level: &Level) -> (Point, f32) {
+    let ray_dir: (f32, f32) = (
+        rotation.degree.to_radians().cos(),
+        rotation.degree.to_radians().sin(),
+    );
     let mut map_pos: (i32, i32) = (pos.x as i32, pos.y as i32);
     let mut side_dist: (f32, f32) = (0.0, 0.0);
     let delta_dist: (f32, f32) = ((1.0 / ray_dir.0).abs(), (1.0 / ray_dir.1).abs());
@@ -509,9 +514,12 @@ fn cast_ray(pos: &Point, rotation: &Rotation, level: &Level) -> Point {
     } else {
         side_dist.1 - delta_dist.1 + 0.0001
     };
-    Point::new(
-        pos.x + (ray_dir.0 * distance),
-        pos.y + (ray_dir.1 * distance),
+    (
+        Point::new(
+            pos.x + (ray_dir.0 * distance),
+            pos.y + (ray_dir.1 * distance),
+        ),
+        distance,
     )
 }
 fn draw_buffer_to_canvas(buffer: Vec<u8>, dest: &web_sys::CanvasRenderingContext2d) {
@@ -624,20 +632,27 @@ pub fn start() -> Result<(), JsValue> {
                 if pressed_key == 97 {
                     RESOLUTION_MULTIPLIER -= 1;
                     RESOLUTION_MULTIPLIER = RESOLUTION_MULTIPLIER.clamp(1, 32);
-                    console_log!("RESOLUTION_MULTIPLIER changed to: {:?}", RESOLUTION_MULTIPLIER);
-                }
-                else if pressed_key == 98 {
+                    console_log!(
+                        "RESOLUTION_MULTIPLIER changed to: {:?}",
+                        RESOLUTION_MULTIPLIER
+                    );
+                } else if pressed_key == 98 {
                     RESOLUTION_MULTIPLIER += 1;
                     RESOLUTION_MULTIPLIER = RESOLUTION_MULTIPLIER.clamp(1, 32);
-                    console_log!("RESOLUTION_MULTIPLIER changed to: {:?}", RESOLUTION_MULTIPLIER);
+                    console_log!(
+                        "RESOLUTION_MULTIPLIER changed to: {:?}",
+                        RESOLUTION_MULTIPLIER
+                    );
+                }
+                if pressed_key == 99 {
+                    FISH_EYE_CORRECTION = !FISH_EYE_CORRECTION;
                 }
 
                 if pressed_key == 100 {
                     FOV -= 1;
                     FOV = FOV.clamp(4, 180);
                     console_log!("FOV changed to: {:?}", FOV);
-                }
-                else if pressed_key == 101 {
+                } else if pressed_key == 101 {
                     FOV += 1;
                     FOV = FOV.clamp(4, 180);
                     console_log!("FOV changed to: {:?}", FOV);
