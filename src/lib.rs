@@ -3,9 +3,10 @@ use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
-const SCREEN_WIDTH: usize = 1920;
-const SCREEN_HEIGHT: usize = 1080;
-const FOV: f32 = 80.0;
+static mut SCREEN_WIDTH: usize = 640;
+static mut SCREEN_HEIGHT: usize = 360;
+
+const FOV: f32 = 90.0;
 const MOVEMENT_SPEED_MODIFIER: f32 = 0.05;
 const INTERNAL_RESOLUTION_MULTIPLIER: u32 = 16;
 
@@ -54,17 +55,17 @@ struct Rect {
 
 impl Rect {
     fn fit_self_to_screen(&mut self) {
-        if self.x >= SCREEN_WIDTH {
-            self.x = SCREEN_WIDTH - 1
+        if self.x >= unsafe { SCREEN_WIDTH } {
+            self.x = unsafe { SCREEN_WIDTH } - 1
         }
-        if self.y >= SCREEN_HEIGHT {
-            self.y = SCREEN_HEIGHT - 1
+        if self.y >= unsafe { SCREEN_HEIGHT } {
+            self.y = unsafe { SCREEN_HEIGHT } - 1
         }
-        if self.x + self.width >= SCREEN_WIDTH {
-            self.width = SCREEN_WIDTH - self.x
+        if self.x + self.width >= unsafe { SCREEN_WIDTH } {
+            self.width = unsafe { SCREEN_WIDTH } - self.x
         }
-        if self.y + self.height >= SCREEN_HEIGHT {
-            self.height = SCREEN_HEIGHT - self.y
+        if self.y + self.height >= unsafe { SCREEN_HEIGHT } {
+            self.height = unsafe { SCREEN_HEIGHT } - self.y
         }
     }
 }
@@ -87,34 +88,6 @@ impl Texture {
             layout: layout_input,
             colors: layout_color,
         }
-    }
-    fn new_from_file(file_id: &str) {
-        // let image_element = web_sys::window()
-        //     .unwrap()
-        //     .document()
-        //     .unwrap()
-        //     .get_element_by_id(file_id)
-        //     .unwrap()
-        //     .dyn_into::<web_sys::HtmlImageElement>()
-        //     .map_err(|_| ())
-        //     .unwrap();
-        // let context = web_sys::window()
-        //     .unwrap()
-        //     .document()
-        //     .unwrap()
-        //     .get_element_by_id("game_canvas")
-        //     .unwrap()
-        //     .dyn_into::<web_sys::HtmlCanvasElement>()
-        //     .map_err(|_| ())
-        //     .unwrap()
-        //     .get_context("2d")
-        //     .unwrap()
-        //     .unwrap()
-        //     .dyn_into::<web_sys::CanvasRenderingContext2d>()
-        //     .unwrap();
-        // context.draw_image_with_html_image_element(&image_element, 0.0, 0.0);
-        // let image_data = context.get_image_data(0.0, 0.0, 0.0, 0.0);
-        // console_log!("{:?}", image_element);
     }
     fn get_color(&self, point: &Point) -> &Color {
         if (point.x >= 0.0 && point.x < (self.width as f32))
@@ -145,9 +118,9 @@ impl Level {
         Level {
             width: layout[0].len(),
             height: layout.len(),
-            layout: layout,
-            all_tiles: all_tiles,
-            all_textures: all_textures,
+            layout,
+            all_tiles,
+            all_textures,
         }
     }
     fn get_tile(&self, point: &Point) -> &Tile {
@@ -205,9 +178,9 @@ struct Tile {
 impl Tile {
     fn new(texture_index: u8, solid: bool, transparent: bool) -> Tile {
         Tile {
-            texture_index: texture_index,
-            solid: solid,
-            transparent: transparent,
+            texture_index,
+            solid,
+            transparent,
         }
     }
 }
@@ -351,7 +324,7 @@ fn draw_rect_to_buffer(dest: &mut Vec<u8>, rect: &mut Rect) {
     rect.fit_self_to_screen();
     for y in 0..rect.height {
         for x in 0..rect.width {
-            let pos: usize = (((rect.y + y) * SCREEN_WIDTH) + rect.x + x) * 4;
+            let pos: usize = (((rect.y + y) * unsafe { SCREEN_WIDTH }) + rect.x + x) * 4;
             dest[pos + 0] = rect.color.r;
             dest[pos + 1] = rect.color.g;
             dest[pos + 2] = rect.color.b;
@@ -369,8 +342,8 @@ fn draw_background(dest: &mut Vec<u8>) {
         &mut Rect {
             x: 0,
             y: 0,
-            width: SCREEN_WIDTH,
-            height: SCREEN_HEIGHT,
+            width: unsafe { SCREEN_WIDTH },
+            height: unsafe { SCREEN_HEIGHT },
             color: Color::new(0x4f, 0x4f, 0x4f),
         },
     )
@@ -386,7 +359,7 @@ fn draw_minimap(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
             draw_rect_to_buffer(
                 dest,
                 &mut Rect {
-                    x: SCREEN_WIDTH - ((x + 2) * TILE_SIZE),
+                    x: unsafe { SCREEN_WIDTH } - ((x + 2) * TILE_SIZE),
                     y: (y + 1) * TILE_SIZE,
                     width: TILE_SIZE,
                     height: TILE_SIZE,
@@ -404,7 +377,7 @@ fn draw_minimap(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
         draw_rect_to_buffer(
             dest,
             &mut Rect {
-                x: SCREEN_WIDTH
+                x: unsafe { SCREEN_WIDTH }
                     - ((camera.pos.x + 1.0) * (TILE_SIZE as f32)) as usize
                     - TILE_SIZE / 4,
                 y: ((camera.pos.y + 1.0) * (TILE_SIZE as f32)) as usize - TILE_SIZE / 4,
@@ -420,7 +393,7 @@ fn draw_minimap(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
         draw_rect_to_buffer(
             dest,
             &mut Rect {
-                x: SCREEN_WIDTH
+                x: unsafe { SCREEN_WIDTH }
                     - ((cast_result.x + 1.0) * (TILE_SIZE as f32)) as usize
                     - TILE_SIZE / 8,
                 y: ((cast_result.y + 1.0) * (TILE_SIZE as f32)) as usize - TILE_SIZE / 8,
@@ -432,8 +405,8 @@ fn draw_minimap(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
     }
 }
 fn draw_walls_to_buffer(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
-    const SLICE_WIDTH: f32 =
-        (SCREEN_WIDTH as f32) / ((FOV as f32) * (INTERNAL_RESOLUTION_MULTIPLIER as f32));
+    let slice_width: f32 =
+        (unsafe { SCREEN_WIDTH } as f32) / ((FOV as f32) * (INTERNAL_RESOLUTION_MULTIPLIER as f32));
     let mut wall_distances: Vec<f32> = vec![];
     let mut cast_results: Vec<Point> = vec![];
 
@@ -451,18 +424,22 @@ fn draw_walls_to_buffer(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
     let mut loop_count: usize = 0;
     for wall_distance in wall_distances {
         if !level.get_tile(&cast_results[loop_count]).transparent {
-            let wall_height: f32 = (SCREEN_HEIGHT as f32) / wall_distance;
+            let wall_height: f32 = (unsafe { SCREEN_HEIGHT } as f32) / wall_distance;
             let texture: &Texture = level.get_texture(&cast_results[loop_count]);
             for i in 0..texture.height {
                 let vertical_slice_height: f32 = wall_height / (texture.height as f32);
                 draw_rect_to_buffer_distanced(
                     dest,
                     &mut Rect {
-                        x: (SLICE_WIDTH * (loop_count as f32)) as usize,
-                        y: (((SCREEN_HEIGHT as f32 - wall_height) / 2.0)
-                            + vertical_slice_height * (i as f32))
-                            as usize,
-                        width: (SLICE_WIDTH + 1.0) as usize,
+                        x: (slice_width * (loop_count as f32)) as usize,
+                        y: (((unsafe { SCREEN_HEIGHT } as f32 - wall_height) / 2.0)
+                            + vertical_slice_height * (i as f32)
+                            + if texture.height >= 8 {
+                                vertical_slice_height / 2.0
+                            } else {
+                                0.0
+                            }) as usize,
+                        width: (slice_width + 1.0) as usize,
                         height: (wall_height / (texture.height as f32)) as usize + 1,
                         color: *texture.get_color(&Point {
                             x: ((cast_results[loop_count].x + cast_results[loop_count].y)
@@ -533,14 +510,11 @@ fn cast_ray(pos: &Point, rotation: &Rotation, level: &Level) -> Point {
         pos.y + (ray_dir.1 * distance),
     )
 }
-fn rgb_to_u32(red: u8, green: u8, blue: u8) -> u32 {
-    (0x10000 * red as u32) + (0x100 * green as u32) + (blue as u32)
-}
 fn draw_buffer_to_canvas(buffer: Vec<u8>, dest: &web_sys::CanvasRenderingContext2d) {
     dest.put_image_data(
         &web_sys::ImageData::new_with_u8_clamped_array(
             wasm_bindgen::Clamped { 0: &buffer },
-            SCREEN_WIDTH as u32,
+            unsafe { SCREEN_WIDTH } as u32,
         )
         .unwrap(),
         0.0,
@@ -568,11 +542,6 @@ pub fn start() -> Result<(), JsValue> {
         .unwrap()
         .dyn_into::<web_sys::CanvasRenderingContext2d>()
         .unwrap();
-
-    game_cavas_html.set_width(SCREEN_WIDTH as u32);
-    game_cavas_html.set_height(SCREEN_HEIGHT as u32);
-
-    Texture::new_from_file("wall_brick.png");
 
     let current_level = Level::new(
         vec![
@@ -698,7 +667,7 @@ pub fn start() -> Result<(), JsValue> {
     // Pointerlock error
     {
         let closure = Closure::wrap(Box::new(move |_event: web_sys::MouseEvent| unsafe {
-            false;
+            POINTER_SHOULD_BE_LOCKED = false;
             GAME_RUNNING = false;
         }) as Box<dyn FnMut(_)>);
         document.add_event_listener_with_callback(
@@ -710,17 +679,18 @@ pub fn start() -> Result<(), JsValue> {
     // Game loop
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
         unsafe {
-            if GAME_RUNNING {
-                {
-                    let mut buffer: Vec<u8> = vec![0; SCREEN_WIDTH * SCREEN_HEIGHT * 4];
+            SCREEN_WIDTH = window.inner_width().unwrap().as_f64().unwrap() as usize;
+            SCREEN_HEIGHT = window.inner_height().unwrap().as_f64().unwrap() as usize;
+            game_cavas_html.set_width(SCREEN_WIDTH as u32);
+            game_cavas_html.set_height(SCREEN_HEIGHT as u32);
 
-                    draw_background(&mut buffer);
-                    draw_walls_to_buffer(&mut buffer, &PLAYER_CAMERA, &current_level);
-                    draw_minimap(&mut buffer, &PLAYER_CAMERA, &current_level);
+            let mut buffer: Vec<u8> = vec![0; SCREEN_WIDTH * SCREEN_HEIGHT * 4];
 
-                    draw_buffer_to_canvas(buffer, &game_canvas);
-                }
-            }
+            draw_background(&mut buffer);
+            draw_walls_to_buffer(&mut buffer, &PLAYER_CAMERA, &current_level);
+            draw_minimap(&mut buffer, &PLAYER_CAMERA, &current_level);
+
+            draw_buffer_to_canvas(buffer, &game_canvas);
         }
         request_animation_frame(f.borrow().as_ref().unwrap());
     }) as Box<dyn FnMut()>));
