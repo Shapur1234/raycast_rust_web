@@ -3,12 +3,12 @@ use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
-static mut SCREEN_WIDTH: usize = 640;
-static mut SCREEN_HEIGHT: usize = 360;
+static mut SCREEN_WIDTH: usize = 0;
+static mut SCREEN_HEIGHT: usize = 0;
 
-const FOV: f32 = 90.0;
-const MOVEMENT_SPEED_MODIFIER: f32 = 0.05;
-const INTERNAL_RESOLUTION_MULTIPLIER: u32 = 16;
+static mut MOVEMENT_SPEED_MODIFIER: f32 = 0.05;
+static mut RESOLUTION_MULTIPLIER: u32 = 16;
+static mut FOV: u32 = 90; 
 
 static mut GAME_RUNNING: bool = false;
 static mut POINTER_SHOULD_BE_LOCKED: bool = false;
@@ -162,9 +162,9 @@ impl Color {
         }
     }
     fn distance_self(&mut self, distance: f32) {
-        self.r = ((self.r as f32 / (distance * 0.6)) as u8).clamp(self.r / 10, self.r);
-        self.g = ((self.g as f32 / (distance * 0.6)) as u8).clamp(self.g / 10, self.g);
-        self.b = ((self.b as f32 / (distance * 0.6)) as u8).clamp(self.b / 10, self.b);
+        self.r = ((self.r as f32 / (distance.powf(0.6))) as u8).clamp(self.r / 10, self.r);
+        self.g = ((self.g as f32 / (distance.powf(0.6))) as u8).clamp(self.g / 10, self.g);
+        self.b = ((self.b as f32 / (distance.powf(0.6))) as u8).clamp(self.b / 10, self.b);
     }
 }
 
@@ -212,12 +212,12 @@ impl Camera {
     }
     fn get_angles_to_cast(&self) -> Vec<Rotation> {
         let mut output: Vec<Rotation> = Vec::new();
-        for i in
-            (self.rotation.degree - (FOV / 2.0)) as i32..(self.rotation.degree + (FOV / 2.0)) as i32
+        for i in (self.rotation.degree - (unsafe { FOV as f32 } / 2.0)) as i32
+            ..(self.rotation.degree + (unsafe { FOV as f32 } / 2.0)) as i32
         {
-            for x in 0..INTERNAL_RESOLUTION_MULTIPLIER {
+            for x in 0..unsafe { RESOLUTION_MULTIPLIER } {
                 output.push(Rotation::new(
-                    i as f32 + (1.0 / INTERNAL_RESOLUTION_MULTIPLIER as f32) * x as f32,
+                    i as f32 + (1.0 / unsafe { RESOLUTION_MULTIPLIER } as f32) * x as f32,
                 ));
             }
         }
@@ -235,20 +235,24 @@ impl Camera {
         }
 
         if input.forward {
-            x_change += MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().cos();
-            y_change += MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().sin();
+            x_change += unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.to_rad().cos();
+            y_change += unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.to_rad().sin();
         }
         if input.backward {
-            x_change -= MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().cos();
-            y_change -= MOVEMENT_SPEED_MODIFIER * self.rotation.to_rad().sin();
+            x_change -= unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.to_rad().cos();
+            y_change -= unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.to_rad().sin();
         }
         if input.right {
-            x_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() + 1.570796).cos();
-            y_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() + 1.570796).sin();
+            x_change +=
+                unsafe { MOVEMENT_SPEED_MODIFIER } * (self.rotation.to_rad() + 1.570796).cos();
+            y_change +=
+                unsafe { MOVEMENT_SPEED_MODIFIER } * (self.rotation.to_rad() + 1.570796).sin();
         }
         if input.left {
-            x_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() - 1.570796).cos();
-            y_change += MOVEMENT_SPEED_MODIFIER * (self.rotation.to_rad() - 1.570796).sin();
+            x_change +=
+                unsafe { MOVEMENT_SPEED_MODIFIER } * (self.rotation.to_rad() - 1.570796).cos();
+            y_change +=
+                unsafe { MOVEMENT_SPEED_MODIFIER } * (self.rotation.to_rad() - 1.570796).sin();
         }
 
         if !level
@@ -405,8 +409,8 @@ fn draw_minimap(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
     }
 }
 fn draw_walls_to_buffer(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
-    let slice_width: f32 =
-        (unsafe { SCREEN_WIDTH } as f32) / ((FOV as f32) * (INTERNAL_RESOLUTION_MULTIPLIER as f32));
+    let slice_width: f32 = (unsafe { SCREEN_WIDTH } as f32)
+        / ((unsafe { FOV } as f32) * (unsafe { RESOLUTION_MULTIPLIER } as f32));
     let mut wall_distances: Vec<f32> = vec![];
     let mut cast_results: Vec<Point> = vec![];
 
@@ -501,9 +505,9 @@ fn cast_ray(pos: &Point, rotation: &Rotation, level: &Level) -> Point {
         }
     }
     let distance: f32 = if side == 0 {
-        side_dist.0 - delta_dist.0 + 0.00001
+        side_dist.0 - delta_dist.0 + 0.0001
     } else {
-        side_dist.1 - delta_dist.1 + 0.00001
+        side_dist.1 - delta_dist.1 + 0.0001
     };
     Point::new(
         pos.x + (ray_dir.0 * distance),
@@ -545,14 +549,21 @@ pub fn start() -> Result<(), JsValue> {
 
     let current_level = Level::new(
         vec![
-            vec![1, 1, 1, 1, 1, 1, 1],
-            vec![1, 0, 0, 0, 0, 0, 1],
-            vec![1, 0, 2, 0, 2, 0, 1],
-            vec![1, 0, 0, 0, 0, 0, 1],
-            vec![1, 0, 0, 0, 0, 0, 1],
-            vec![1, 0, 2, 0, 2, 0, 1],
-            vec![1, 0, 0, 0, 0, 0, 1],
-            vec![1, 1, 1, 1, 1, 1, 1],
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            vec![1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1],
+            vec![1, 0, 2, 0, 2, 0, 1, 0, 2, 0, 2, 0, 1],
+            vec![1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1],
+            vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1],
+            vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
+            vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1],
+            vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            vec![1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1],
+            vec![1, 0, 2, 0, 2, 0, 1, 0, 2, 0, 2, 0, 1],
+            vec![1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1],
+            vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         ],
         vec![
             Tile::new(0, false, true),
@@ -609,6 +620,28 @@ pub fn start() -> Result<(), JsValue> {
                         rot_left: if pressed_key == 81 { true } else { false },
                     },
                 );
+
+                if pressed_key == 97 {
+                    RESOLUTION_MULTIPLIER -= 1;
+                    RESOLUTION_MULTIPLIER = RESOLUTION_MULTIPLIER.clamp(1, 32);
+                    console_log!("RESOLUTION_MULTIPLIER changed to: {:?}", RESOLUTION_MULTIPLIER);
+                }
+                else if pressed_key == 98 {
+                    RESOLUTION_MULTIPLIER += 1;
+                    RESOLUTION_MULTIPLIER = RESOLUTION_MULTIPLIER.clamp(1, 32);
+                    console_log!("RESOLUTION_MULTIPLIER changed to: {:?}", RESOLUTION_MULTIPLIER);
+                }
+
+                if pressed_key == 100 {
+                    FOV -= 1;
+                    FOV = FOV.clamp(1, 180);
+                    console_log!("FOV changed to: {:?}", FOV);
+                }
+                else if pressed_key == 101 {
+                    FOV += 1;
+                    FOV = FOV.clamp(1, 180);
+                    console_log!("FOV changed to: {:?}", FOV);
+                }
             }
         }) as Box<dyn FnMut(_)>);
         window.add_event_listener_with_callback("keydown", closure.as_ref().unchecked_ref())?;

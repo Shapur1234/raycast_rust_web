@@ -25,4 +25,5 @@ features = [
   'Window',
   'ImageData',
   'HtmlImageElement',
+  'HtmlBodyElement',
 ]
