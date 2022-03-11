@@ -8,7 +8,6 @@ const SCREEN_HEIGHT: usize = 1080;
 const FOV: f32 = 80.0;
 const MOVEMENT_SPEED_MODIFIER: f32 = 0.05;
 const INTERNAL_RESOLUTION_MULTIPLIER: u32 = 16;
-const RENDER_DISTANCE: f32 = 20.0;
 
 static mut GAME_RUNNING: bool = false;
 static mut POINTER_SHOULD_BE_LOCKED: bool = false;
@@ -483,79 +482,56 @@ fn calc_distance_between_points(point1: &Point, point2: &Point) -> f32 {
     ((point1.x - point2.x).powf(2.0) + (point1.y - point2.y).powf(2.0)).powf(0.5)
 }
 fn cast_ray(pos: &Point, rotation: &Rotation, level: &Level) -> Point {
-    // let direction: (f32, f32) = (rotation.to_rad().cos(), rotation.to_rad().sin());
-    // let step_size: (f32, f32) = (
-    //     (1.0 + ((direction.1 / direction.0).powf(2.0))).sqrt(),
-    //     (1.0 + ((direction.0 / direction.1).powf(2.0))).sqrt(),
-    // );
-    // let mut map_check: (i32, i32) = (pos.x as i32, pos.y as i32);
-    // let mut ray_length: (f32, f32) = (0.0, 0.0);
-    // let mut step: (i32, i32) = (0, 0);
+    let ray_dir: (f32, f32) = (rotation.to_rad().cos(), rotation.to_rad().sin());
+    let mut map_pos: (i32, i32) = (pos.x as i32, pos.y as i32);
+    let mut side_dist: (f32, f32) = (0.0, 0.0);
+    let delta_dist: (f32, f32) = ((1.0 / ray_dir.0).abs(), (1.0 / ray_dir.1).abs());
+    let mut step: (i32, i32) = (0, 0);
+    let mut side: u8 = 0;
 
-    // if direction.0 < 0.0 {
-    //     step.0 = -1;
-    //     ray_length.0 = (pos.x - map_check.0 as f32) * step_size.0;
-    // } else {
-    //     step.0 = 1;
-    //     ray_length.0 = (((map_check.0 + 1) as f32) - pos.x) * step_size.0;
-    // }
+    if ray_dir.0 < 0.0 {
+        step.0 = -1;
+        side_dist.0 = (pos.x - map_pos.0 as f32) * delta_dist.0;
+    } else {
+        step.0 = 1;
+        side_dist.0 = (((map_pos.0 + 1) as f32) - pos.x) * delta_dist.0;
+    }
 
-    // if direction.1 < 0.0 {
-    //     step.1 = -1;
-    //     ray_length.1 = (pos.y - map_check.1 as f32) * step_size.1;
-    // } else {
-    //     step.1 = 1;
-    //     ray_length.1 = (((map_check.1 + 1) as f32) - pos.x) * step_size.1;
-    // }
+    if ray_dir.1 < 0.0 {
+        step.1 = -1;
+        side_dist.1 = (pos.y - map_pos.1 as f32) * delta_dist.1;
+    } else {
+        step.1 = 1;
+        side_dist.1 = (((map_pos.1 + 1) as f32) - pos.y) * delta_dist.1;
+    }
 
-    // let mut distance: f32 = 0.0;
-    // let mut tile_found: bool = false;
-    // while !tile_found && distance < RENDER_DISTANCE {
-    //     if ray_length.0 < ray_length.1 {
-    //         map_check.0 += step.0;
-    //         distance = ray_length.0;
-    //         ray_length.0 += step_size.0;
-    //     }
-    //     else {
-    //         map_check.1 += step.1;
-    //         distance = ray_length.1;
-    //         ray_length.1 += step_size.1;
-    //     }
+    for _ in 0..1000 {
+        if side_dist.0 < side_dist.1 {
+            side_dist.0 += delta_dist.0;
+            map_pos.0 += step.0;
+            side = 0;
+        } else {
+            side_dist.1 += delta_dist.1;
+            map_pos.1 += step.1;
+            side = 1;
+        }
 
-    //     if !level.get_tile(&Point::new(map_check.0 as f32, map_check.1 as f32)).transparent {
-    //         tile_found = true;
-    //     }
-    // }
-
-    // if tile_found {
-    //     Point::new(map_check.0 as f32, map_check.1 as f32)
-    // }
-    // else {
-    //     Point::new(-1000.0, -1000.0)
-    // }
-
-    const STEP: f32 = 0.01;
-
-    let mut distance_travelled: f32 = 0.0;
-    let mut point_to_check = Point::new(pos.x, pos.y);
-    let mut has_hit: bool = false;
-    while distance_travelled.abs() < RENDER_DISTANCE {
-        distance_travelled += STEP;
-
-        point_to_check = Point::new(
-            pos.x + (distance_travelled * rotation.to_rad().cos()),
-            pos.y + (distance_travelled * rotation.to_rad().sin()),
-        );
-        if !level.get_tile(&point_to_check).transparent {
-            has_hit = true;
+        if !level
+            .get_tile(&Point::new(map_pos.0 as f32, map_pos.1 as f32))
+            .transparent
+        {
             break;
         }
     }
-    if has_hit {
-        point_to_check
+    let distance: f32 = if side == 0 {
+        side_dist.0 - delta_dist.0 + 0.00001
     } else {
-        Point::new(-1000.0, -1000.0)
-    }
+        side_dist.1 - delta_dist.1 + 0.00001
+    };
+    Point::new(
+        pos.x + (ray_dir.0 * distance),
+        pos.y + (ray_dir.1 * distance),
+    )
 }
 fn rgb_to_u32(red: u8, green: u8, blue: u8) -> u32 {
     (0x10000 * red as u32) + (0x100 * green as u32) + (blue as u32)
@@ -600,14 +576,14 @@ pub fn start() -> Result<(), JsValue> {
 
     let current_level = Level::new(
         vec![
-            vec![1, 1, 1, 0, 1, 1, 1],
+            vec![1, 1, 1, 1, 1, 1, 1],
             vec![1, 0, 0, 0, 0, 0, 1],
-            vec![1, 1, 2, 0, 2, 1, 1],
-            vec![1, 0, 0, 0, 1, 0, 1],
-            vec![1, 0, 1, 0, 0, 0, 1],
-            vec![1, 1, 2, 0, 2, 1, 1],
+            vec![1, 0, 2, 0, 2, 0, 1],
             vec![1, 0, 0, 0, 0, 0, 1],
-            vec![1, 1, 1, 0, 1, 1, 1],
+            vec![1, 0, 0, 0, 0, 0, 1],
+            vec![1, 0, 2, 0, 2, 0, 1],
+            vec![1, 0, 0, 0, 0, 0, 1],
+            vec![1, 1, 1, 1, 1, 1, 1],
         ],
         vec![
             Tile::new(0, false, true),
@@ -641,8 +617,8 @@ pub fn start() -> Result<(), JsValue> {
                 vec![Color::new(205, 84, 75), Color::new(123, 46, 47)],
             ),
             Texture::new(
-                vec![vec![0, 0], vec![1, 1]],
-                vec![Color::new(205, 84, 75), Color::new(123, 46, 47)],
+                vec![vec![0, 1], vec![1, 0]],
+                vec![Color::new(0, 255, 255), Color::new(255, 255, 0)],
             ),
         ],
     );
