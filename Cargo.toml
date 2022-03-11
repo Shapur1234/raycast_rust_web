@@ -24,4 +24,5 @@ features = [
   'EventListener',
   'Window',
   'ImageData',
+  'HtmlImageElement',
 ]

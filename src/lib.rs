@@ -89,6 +89,34 @@ impl Texture {
             colors: layout_color,
         }
     }
+    fn new_from_file(file_id: &str) {
+        // let image_element = web_sys::window()
+        //     .unwrap()
+        //     .document()
+        //     .unwrap()
+        //     .get_element_by_id(file_id)
+        //     .unwrap()
+        //     .dyn_into::<web_sys::HtmlImageElement>()
+        //     .map_err(|_| ())
+        //     .unwrap();
+        // let context = web_sys::window()
+        //     .unwrap()
+        //     .document()
+        //     .unwrap()
+        //     .get_element_by_id("game_canvas")
+        //     .unwrap()
+        //     .dyn_into::<web_sys::HtmlCanvasElement>()
+        //     .map_err(|_| ())
+        //     .unwrap()
+        //     .get_context("2d")
+        //     .unwrap()
+        //     .unwrap()
+        //     .dyn_into::<web_sys::CanvasRenderingContext2d>()
+        //     .unwrap();
+        // context.draw_image_with_html_image_element(&image_element, 0.0, 0.0);
+        // let image_data = context.get_image_data(0.0, 0.0, 0.0, 0.0);
+        // console_log!("{:?}", image_element);
+    }
     fn get_color(&self, point: &Point) -> &Color {
         if (point.x >= 0.0 && point.x < (self.width as f32))
             && (point.y >= 0.0 && point.y < (self.height as f32))
@@ -212,8 +240,8 @@ impl Camera {
     }
     fn get_angles_to_cast(&self) -> Vec<Rotation> {
         let mut output: Vec<Rotation> = Vec::new();
-        for i in (self.rotation.degree - (FOV / 2.0)) as i32
-            ..(self.rotation.degree  + (FOV / 2.0)) as i32
+        for i in
+            (self.rotation.degree - (FOV / 2.0)) as i32..(self.rotation.degree + (FOV / 2.0)) as i32
         {
             for x in 0..INTERNAL_RESOLUTION_MULTIPLIER {
                 output.push(Rotation::new(
@@ -405,30 +433,36 @@ fn draw_minimap(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
     }
 }
 fn draw_walls_to_buffer(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
-    const SLICE_WIDTH: f32 = (SCREEN_WIDTH as f32) / ((FOV as f32) *  (INTERNAL_RESOLUTION_MULTIPLIER as f32));
+    const SLICE_WIDTH: f32 =
+        (SCREEN_WIDTH as f32) / ((FOV as f32) * (INTERNAL_RESOLUTION_MULTIPLIER as f32));
     let mut wall_distances: Vec<f32> = vec![];
     let mut cast_results: Vec<Point> = vec![];
 
-    for angle in camera.get_angles_to_cast() {
+    let angles: Vec<Rotation> = camera.get_angles_to_cast();
+    let mut i: usize = 0;
+    for angle in angles {
         cast_results.push(cast_ray(&camera.pos, &angle, &level));
-    }
-
-    for cast_result in &cast_results {
-        wall_distances.push(calc_distance_between_points(&camera.pos, &cast_result));
+        wall_distances.push(
+            calc_distance_between_points(&camera.pos, &cast_results[i])
+                * (angle.to_rad() - camera.rotation.to_rad()).cos(),
+        );
+        i += 1;
     }
 
     let mut loop_count: usize = 0;
     for wall_distance in wall_distances {
         if !level.get_tile(&cast_results[loop_count]).transparent {
-            let wall_height: f32 = SCREEN_HEIGHT as f32 / wall_distance;
+            let wall_height: f32 = (SCREEN_HEIGHT as f32) / wall_distance;
             let texture: &Texture = level.get_texture(&cast_results[loop_count]);
             for i in 0..texture.height {
+                let vertical_slice_height: f32 = wall_height / (texture.height as f32);
                 draw_rect_to_buffer_distanced(
                     dest,
                     &mut Rect {
                         x: (SLICE_WIDTH * (loop_count as f32)) as usize,
-                        y: ((SCREEN_HEIGHT as f32 - wall_height) / 2.0) as usize
-                            + ((wall_height / (texture.height as f32)) * i as f32) as usize,
+                        y: (((SCREEN_HEIGHT as f32 - wall_height) / 2.0)
+                            + vertical_slice_height * (i as f32))
+                            as usize,
                         width: (SLICE_WIDTH + 1.0) as usize,
                         height: (wall_height / (texture.height as f32)) as usize + 1,
                         color: *texture.get_color(&Point {
@@ -449,6 +483,57 @@ fn calc_distance_between_points(point1: &Point, point2: &Point) -> f32 {
     ((point1.x - point2.x).powf(2.0) + (point1.y - point2.y).powf(2.0)).powf(0.5)
 }
 fn cast_ray(pos: &Point, rotation: &Rotation, level: &Level) -> Point {
+    // let direction: (f32, f32) = (rotation.to_rad().cos(), rotation.to_rad().sin());
+    // let step_size: (f32, f32) = (
+    //     (1.0 + ((direction.1 / direction.0).powf(2.0))).sqrt(),
+    //     (1.0 + ((direction.0 / direction.1).powf(2.0))).sqrt(),
+    // );
+    // let mut map_check: (i32, i32) = (pos.x as i32, pos.y as i32);
+    // let mut ray_length: (f32, f32) = (0.0, 0.0);
+    // let mut step: (i32, i32) = (0, 0);
+
+    // if direction.0 < 0.0 {
+    //     step.0 = -1;
+    //     ray_length.0 = (pos.x - map_check.0 as f32) * step_size.0;
+    // } else {
+    //     step.0 = 1;
+    //     ray_length.0 = (((map_check.0 + 1) as f32) - pos.x) * step_size.0;
+    // }
+
+    // if direction.1 < 0.0 {
+    //     step.1 = -1;
+    //     ray_length.1 = (pos.y - map_check.1 as f32) * step_size.1;
+    // } else {
+    //     step.1 = 1;
+    //     ray_length.1 = (((map_check.1 + 1) as f32) - pos.x) * step_size.1;
+    // }
+
+    // let mut distance: f32 = 0.0;
+    // let mut tile_found: bool = false;
+    // while !tile_found && distance < RENDER_DISTANCE {
+    //     if ray_length.0 < ray_length.1 {
+    //         map_check.0 += step.0;
+    //         distance = ray_length.0;
+    //         ray_length.0 += step_size.0;
+    //     }
+    //     else {
+    //         map_check.1 += step.1;
+    //         distance = ray_length.1;
+    //         ray_length.1 += step_size.1;
+    //     }
+
+    //     if !level.get_tile(&Point::new(map_check.0 as f32, map_check.1 as f32)).transparent {
+    //         tile_found = true;
+    //     }
+    // }
+
+    // if tile_found {
+    //     Point::new(map_check.0 as f32, map_check.1 as f32)
+    // }
+    // else {
+    //     Point::new(-1000.0, -1000.0)
+    // }
+
     const STEP: f32 = 0.01;
 
     let mut distance_travelled: f32 = 0.0;
@@ -511,6 +596,8 @@ pub fn start() -> Result<(), JsValue> {
     game_cavas_html.set_width(SCREEN_WIDTH as u32);
     game_cavas_html.set_height(SCREEN_HEIGHT as u32);
 
+    Texture::new_from_file("wall_brick.png");
+
     let current_level = Level::new(
         vec![
             vec![1, 1, 1, 0, 1, 1, 1],
@@ -554,25 +641,8 @@ pub fn start() -> Result<(), JsValue> {
                 vec![Color::new(205, 84, 75), Color::new(123, 46, 47)],
             ),
             Texture::new(
-                vec![
-                    vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-                    vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
-                    vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                ],
-                vec![Color::new(255, 239, 47), Color::new(0, 0, 255)],
+                vec![vec![0, 0], vec![1, 1]],
+                vec![Color::new(205, 84, 75), Color::new(123, 46, 47)],
             ),
         ],
     );
@@ -670,7 +740,7 @@ pub fn start() -> Result<(), JsValue> {
 
                     draw_background(&mut buffer);
                     draw_walls_to_buffer(&mut buffer, &PLAYER_CAMERA, &current_level);
-                    // draw_minimap(&mut buffer, &PLAYER_CAMERA, &current_level);
+                    draw_minimap(&mut buffer, &PLAYER_CAMERA, &current_level);
 
                     draw_buffer_to_canvas(buffer, &game_canvas);
                 }

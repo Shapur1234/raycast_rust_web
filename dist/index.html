@@ -1,36 +1,19 @@
 <html><head>
-<link rel="preload" href="/index-67ee447063e15288_bg.wasm" as="fetch" type="application/wasm" crossorigin="">
-<link rel="modulepreload" href="/index-67ee447063e15288.js"></head><body><html">
+<link rel="preload" href="/index-b9fb9a538c986c62_bg.wasm" as="fetch" type="application/wasm" crossorigin="">
+<link rel="modulepreload" href="/index-b9fb9a538c986c62.js"></head><body style="margin: 0;"><html">
 
     <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" type="text/css" href="style.css">
     <script type="text/jsx" src="./index.js"></script>
     <title>Wolfeinstein 2.0</title>
-    <style>
-        .canvas {
-        display: block;
-        margin: auto;
-        }
-        .title {
-        text-align: center;
-        font-size: 2em;
-        padding: 1%;
-        font-family: Century Gothic, sans-serif;
-        }
-        .subtitle {
-        padding: 1px;
-        font-family: Century Gothic, sans-serif;
-        }
-    </style>
 
 
-    
-    <div>
-        <canvas id="game_canvas" class="canvas"></canvas>
-    </div>
+    <canvas id="game_canvas"></canvas>
 
-</html"><script type="module">import init from '/index-67ee447063e15288.js';init('/index-67ee447063e15288_bg.wasm');</script><script>(function () {
+    <img id="wall_brick" src="resources/textures/wall_brick.png">
+
+</html"><script type="module">import init from '/index-b9fb9a538c986c62.js';init('/index-b9fb9a538c986c62_bg.wasm');</script><script>(function () {
     var url = 'ws://' + window.location.host + '/_trunk/ws';
     var poll_interval = 5000;
     var reload_upon_connect = () => {
