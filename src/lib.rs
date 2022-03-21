@@ -14,7 +14,7 @@ static mut FISH_EYE_CORRECTION: bool = true;
 static mut GAME_RUNNING: bool = false;
 static mut POINTER_SHOULD_BE_LOCKED: bool = false;
 static mut PLAYER_CAMERA: Camera = Camera {
-    pos: Point { x: 1.5, y: 1.5 },
+    pos: Point { x: 6.5, y: 7.5 },
     rotation: Rotation { degree: 0.0 },
 };
 
@@ -45,7 +45,7 @@ fn request_animation_frame(f: &Closure<dyn FnMut()>) {
 
 // --------------------------------------------------------------------------------
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 struct Rect {
     x: usize,
     y: usize,
@@ -55,18 +55,38 @@ struct Rect {
 }
 
 impl Rect {
-    fn fit_self_to_screen(&mut self) {
-        if self.x >= unsafe { SCREEN_WIDTH } {
-            self.x = unsafe { SCREEN_WIDTH } - 1
+    fn new() -> Rect {
+        unimplemented!();
+    }
+    fn fit_to_screen(&self) -> Rect {
+        let mut rect_temp: Rect = *self;
+
+        if rect_temp.x >= unsafe { SCREEN_WIDTH } {
+            rect_temp.x = unsafe { SCREEN_WIDTH } - 1
         }
-        if self.y >= unsafe { SCREEN_HEIGHT } {
-            self.y = unsafe { SCREEN_HEIGHT } - 1
+        if rect_temp.y >= unsafe { SCREEN_HEIGHT } {
+            rect_temp.y = unsafe { SCREEN_HEIGHT } - 1
         }
-        if self.x + self.width >= unsafe { SCREEN_WIDTH } {
-            self.width = unsafe { SCREEN_WIDTH } - self.x
+        if rect_temp.x + rect_temp.width >= unsafe { SCREEN_WIDTH } {
+            rect_temp.width = unsafe { SCREEN_WIDTH } - rect_temp.x
         }
-        if self.y + self.height >= unsafe { SCREEN_HEIGHT } {
-            self.height = unsafe { SCREEN_HEIGHT } - self.y
+        if rect_temp.y + rect_temp.height >= unsafe { SCREEN_HEIGHT } {
+            rect_temp.height = unsafe { SCREEN_HEIGHT } - rect_temp.y
+        }
+
+        rect_temp
+    }
+    fn draw(&self, dest: &mut Vec<u8>) {
+        let rect_temp = self.fit_to_screen();
+
+        for y in 0..rect_temp.height {
+            for x in 0..rect_temp.width {
+                let pos: usize = (((rect_temp.y + y) * unsafe { SCREEN_WIDTH }) + rect_temp.x + x) * 4;
+                dest[pos + 0] = rect_temp.color.r;
+                dest[pos + 1] = rect_temp.color.g;
+                dest[pos + 2] = rect_temp.color.b;
+                dest[pos + 3] = 255;
+            }
         }
     }
 }
@@ -91,9 +111,7 @@ impl Texture {
         }
     }
     fn get_color(&self, point: &Point) -> &Color {
-        if (point.x >= 0.0 && point.x < (self.width as f32))
-            && (point.y >= 0.0 && point.y < (self.height as f32))
-        {
+        if (point.x >= 0.0 && point.x < (self.width as f32)) && (point.y >= 0.0 && point.y < (self.height as f32)) {
             &self.colors[self.layout[point.y as usize][point.x as usize]]
         }
         // TODO FIX
@@ -125,9 +143,7 @@ impl Level {
         }
     }
     fn get_tile(&self, point: &Point) -> &Tile {
-        if (point.x >= 0.0 && point.x < (self.width as f32))
-            && (point.y >= 0.0 && point.y < (self.height as f32))
-        {
+        if (point.x >= 0.0 && point.x < (self.width as f32)) && (point.y >= 0.0 && point.y < (self.height as f32)) {
             &self.all_tiles[self.layout[point.y as usize][point.x as usize] as usize]
         } else {
             &self.all_tiles[0]
@@ -137,9 +153,7 @@ impl Level {
         &self.all_textures[self.get_tile(point).texture_index as usize]
     }
     fn is_in_level(&self, point: &Point) -> bool {
-        if (point.x < 0.0 || point.x > self.width as f32)
-            || (point.y < 0.0 || point.y > self.height as f32)
-        {
+        if (point.x < 0.0 || point.x > self.width as f32) || (point.y < 0.0 || point.y > self.height as f32) {
             false
         } else {
             true
@@ -162,10 +176,12 @@ impl Color {
             b: blue,
         }
     }
-    fn distance_self(&mut self, distance: f32) {
-        self.r = ((self.r as f32 / (distance.powf(0.6))) as u8).clamp(self.r / 10, self.r);
-        self.g = ((self.g as f32 / (distance.powf(0.6))) as u8).clamp(self.g / 10, self.g);
-        self.b = ((self.b as f32 / (distance.powf(0.6))) as u8).clamp(self.b / 10, self.b);
+    fn shade_distance(&self, distance: f32) -> Color {
+        Color::new(
+            ((self.r as f32 / (distance.powf(0.8))) as u8).clamp(self.r / 16, self.r),
+            ((self.g as f32 / (distance.powf(0.8))) as u8).clamp(self.g / 16, self.g),
+            ((self.b as f32 / (distance.powf(0.8))) as u8).clamp(self.b / 16, self.b),
+        )
     }
 }
 
@@ -236,28 +252,20 @@ impl Camera {
         }
 
         if input.forward {
-            x_change +=
-                unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.degree.to_radians().cos();
-            y_change +=
-                unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.degree.to_radians().sin();
+            x_change += unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.degree.to_radians().cos();
+            y_change += unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.degree.to_radians().sin();
         }
         if input.backward {
-            x_change -=
-                unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.degree.to_radians().cos();
-            y_change -=
-                unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.degree.to_radians().sin();
+            x_change -= unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.degree.to_radians().cos();
+            y_change -= unsafe { MOVEMENT_SPEED_MODIFIER } * self.rotation.degree.to_radians().sin();
         }
         if input.right {
-            x_change += unsafe { MOVEMENT_SPEED_MODIFIER }
-                * (self.rotation.degree.to_radians() + 1.570796).cos();
-            y_change += unsafe { MOVEMENT_SPEED_MODIFIER }
-                * (self.rotation.degree.to_radians() + 1.570796).sin();
+            x_change += unsafe { MOVEMENT_SPEED_MODIFIER } * (self.rotation.degree.to_radians() + 1.570796).cos();
+            y_change += unsafe { MOVEMENT_SPEED_MODIFIER } * (self.rotation.degree.to_radians() + 1.570796).sin();
         }
         if input.left {
-            x_change += unsafe { MOVEMENT_SPEED_MODIFIER }
-                * (self.rotation.degree.to_radians() - 1.570796).cos();
-            y_change += unsafe { MOVEMENT_SPEED_MODIFIER }
-                * (self.rotation.degree.to_radians() - 1.570796).sin();
+            x_change += unsafe { MOVEMENT_SPEED_MODIFIER } * (self.rotation.degree.to_radians() - 1.570796).cos();
+            y_change += unsafe { MOVEMENT_SPEED_MODIFIER } * (self.rotation.degree.to_radians() - 1.570796).sin();
         }
 
         if !level
@@ -326,33 +334,15 @@ impl Point {
 
 // --------------------------------------------------------------------------------
 
-fn draw_rect_to_buffer(dest: &mut Vec<u8>, rect: &mut Rect) {
-    rect.fit_self_to_screen();
-    for y in 0..rect.height {
-        for x in 0..rect.width {
-            let pos: usize = (((rect.y + y) * unsafe { SCREEN_WIDTH }) + rect.x + x) * 4;
-            dest[pos + 0] = rect.color.r;
-            dest[pos + 1] = rect.color.g;
-            dest[pos + 2] = rect.color.b;
-            dest[pos + 3] = 255;
-        }
-    }
-}
-fn draw_rect_to_buffer_distanced(dest: &mut Vec<u8>, rect: &mut Rect, distance: f32) {
-    rect.color.distance_self(distance);
-    draw_rect_to_buffer(dest, rect);
-}
 fn draw_background(dest: &mut Vec<u8>) {
-    draw_rect_to_buffer(
-        dest,
-        &mut Rect {
-            x: 0,
-            y: 0,
-            width: unsafe { SCREEN_WIDTH },
-            height: unsafe { SCREEN_HEIGHT },
-            color: Color::new(0x4f, 0x4f, 0x4f),
-        },
-    )
+    Rect {
+        x: 0,
+        y: 0,
+        width: unsafe { SCREEN_WIDTH },
+        height: unsafe { SCREEN_HEIGHT },
+        color: Color::new(0x4f, 0x4f, 0x4f),
+    }
+    .draw(dest);
 }
 fn draw_minimap(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
     const TILE_SIZE: usize = 16;
@@ -362,57 +352,47 @@ fn draw_minimap(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
             let tile_pos = &Point::new(x as f32, y as f32);
             let tile = level.get_tile(tile_pos);
             let texture = level.get_texture(tile_pos);
-            draw_rect_to_buffer(
-                dest,
-                &mut Rect {
-                    x: unsafe { SCREEN_WIDTH } - ((x + 2) * TILE_SIZE),
-                    y: (y + 1) * TILE_SIZE,
-                    width: TILE_SIZE,
-                    height: TILE_SIZE,
-                    color: if !tile.transparent {
-                        texture.colors[0]
-                    } else {
-                        Color::new(255, 255, 255)
-                    },
+            Rect {
+                x: unsafe { SCREEN_WIDTH } - ((x + 2) * TILE_SIZE),
+                y: (y + 1) * TILE_SIZE,
+                width: TILE_SIZE,
+                height: TILE_SIZE,
+                color: if !tile.transparent {
+                    texture.colors[0]
+                } else {
+                    Color::new(255, 255, 255)
                 },
-            );
+            }
+            .draw(dest);
         }
     }
 
     if level.is_in_level(&camera.pos) {
-        draw_rect_to_buffer(
-            dest,
-            &mut Rect {
-                x: unsafe { SCREEN_WIDTH }
-                    - ((camera.pos.x + 1.0) * (TILE_SIZE as f32)) as usize
-                    - TILE_SIZE / 4,
-                y: ((camera.pos.y + 1.0) * (TILE_SIZE as f32)) as usize - TILE_SIZE / 4,
-                width: TILE_SIZE / 2,
-                height: TILE_SIZE / 2,
-                color: Color::new(255, 0, 0),
-            },
-        );
+        Rect {
+            x: unsafe { SCREEN_WIDTH } - ((camera.pos.x + 1.0) * (TILE_SIZE as f32)) as usize - TILE_SIZE / 4,
+            y: ((camera.pos.y + 1.0) * (TILE_SIZE as f32)) as usize - TILE_SIZE / 4,
+            width: TILE_SIZE / 2,
+            height: TILE_SIZE / 2,
+            color: Color::new(255, 0, 0),
+        }
+        .draw(dest);
     }
 
     let cast_result: Point = cast_ray(&camera.pos, &camera.rotation, level).0;
     if level.is_in_level(&cast_result) {
-        draw_rect_to_buffer(
-            dest,
-            &mut Rect {
-                x: unsafe { SCREEN_WIDTH }
-                    - ((cast_result.x + 1.0) * (TILE_SIZE as f32)) as usize
-                    - TILE_SIZE / 8,
-                y: ((cast_result.y + 1.0) * (TILE_SIZE as f32)) as usize - TILE_SIZE / 8,
-                width: TILE_SIZE / 4,
-                height: TILE_SIZE / 4,
-                color: Color::new(0, 0, 255),
-            },
-        );
+        Rect {
+            x: unsafe { SCREEN_WIDTH } - ((cast_result.x + 1.0) * (TILE_SIZE as f32)) as usize - TILE_SIZE / 8,
+            y: ((cast_result.y + 1.0) * (TILE_SIZE as f32)) as usize - TILE_SIZE / 8,
+            width: TILE_SIZE / 4,
+            height: TILE_SIZE / 4,
+            color: Color::new(0, 0, 255),
+        }
+        .draw(dest);
     }
 }
 fn draw_walls_to_buffer(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
-    let slice_width: f32 = (unsafe { SCREEN_WIDTH } as f32)
-        / ((unsafe { FOV } as f32) * (unsafe { RESOLUTION_MULTIPLIER } as f32));
+    let slice_width: f32 =
+        (unsafe { SCREEN_WIDTH } as f32) / ((unsafe { FOV } as f32) * (unsafe { RESOLUTION_MULTIPLIER } as f32));
     let mut cast_distances: Vec<f32> = vec![];
     let mut cast_points: Vec<Point> = vec![];
 
@@ -437,38 +417,33 @@ fn draw_walls_to_buffer(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
             let texture: &Texture = level.get_texture(&cast_points[loop_count]);
             for i in 0..texture.height {
                 let vertical_slice_height: f32 = wall_height / (texture.height as f32);
-                draw_rect_to_buffer_distanced(
-                    dest,
-                    &mut Rect {
-                        x: (slice_width * (loop_count as f32)) as usize,
-                        y: (((unsafe { SCREEN_HEIGHT } as f32 - wall_height) / 2.0)
-                            + vertical_slice_height * (i as f32)
-                            + if texture.height >= 8 {
-                                vertical_slice_height / 2.0
-                            } else {
-                                0.0
-                            }) as usize,
-                        width: (slice_width + 1.0) as usize,
-                        height: (wall_height / (texture.height as f32)) as usize + 1,
-                        color: *texture.get_color(&Point {
-                            x: ((cast_points[loop_count].x + cast_points[loop_count].y)
-                                * (texture.width as f32))
+                Rect {
+                    x: (slice_width * (loop_count as f32)) as usize,
+                    y: (((unsafe { SCREEN_HEIGHT } as f32 - wall_height) / 2.0)
+                        + vertical_slice_height * (i as f32)
+                        + if texture.height >= 8 {
+                            vertical_slice_height / 2.0
+                        } else {
+                            0.0
+                        }) as usize,
+                    width: (slice_width + 1.0) as usize,
+                    height: (wall_height / (texture.height as f32)) as usize + 1,
+                    color: texture
+                        .get_color(&Point {
+                            x: ((cast_points[loop_count].x + cast_points[loop_count].y) * (texture.width as f32))
                                 % (texture.width as f32),
                             y: i as f32,
-                        }),
-                    },
-                    wall_distance,
-                );
+                        })
+                        .shade_distance(wall_distance),
+                }
+                .draw(dest);
             }
         }
         loop_count += 1;
     }
 }
 fn cast_ray(pos: &Point, rotation: &Rotation, level: &Level) -> (Point, f32) {
-    let ray_dir: (f32, f32) = (
-        rotation.degree.to_radians().cos(),
-        rotation.degree.to_radians().sin(),
-    );
+    let ray_dir: (f32, f32) = (rotation.degree.to_radians().cos(), rotation.degree.to_radians().sin());
     let mut map_pos: (i32, i32) = (pos.x as i32, pos.y as i32);
     let mut side_dist: (f32, f32) = (0.0, 0.0);
     let delta_dist: (f32, f32) = ((1.0 / ray_dir.0).abs(), (1.0 / ray_dir.1).abs());
@@ -515,19 +490,14 @@ fn cast_ray(pos: &Point, rotation: &Rotation, level: &Level) -> (Point, f32) {
         side_dist.1 - delta_dist.1 + 0.0001
     };
     (
-        Point::new(
-            pos.x + (ray_dir.0 * distance),
-            pos.y + (ray_dir.1 * distance),
-        ),
+        Point::new(pos.x + (ray_dir.0 * distance), pos.y + (ray_dir.1 * distance)),
         distance,
     )
 }
 fn draw_buffer_to_canvas(buffer: Vec<u8>, dest: &web_sys::CanvasRenderingContext2d) {
     dest.put_image_data(
-        &web_sys::ImageData::new_with_u8_clamped_array(
-            wasm_bindgen::Clamped { 0: &buffer },
-            unsafe { SCREEN_WIDTH } as u32,
-        )
+        &web_sys::ImageData::new_with_u8_clamped_array(wasm_bindgen::Clamped { 0: &buffer }, unsafe { SCREEN_WIDTH }
+            as u32)
         .unwrap(),
         0.0,
         0.0,
@@ -542,13 +512,13 @@ pub fn start() -> Result<(), JsValue> {
     let window = web_sys::window().unwrap();
     let document = window.document().unwrap();
 
-    let game_cavas_html = document
+    let game_canvas_html = document
         .get_element_by_id("game_canvas")
         .unwrap()
         .dyn_into::<web_sys::HtmlCanvasElement>()
         .map_err(|_| ())
         .unwrap();
-    let game_canvas = game_cavas_html
+    let game_canvas = game_canvas_html
         .get_context("2d")
         .unwrap()
         .unwrap()
@@ -558,8 +528,8 @@ pub fn start() -> Result<(), JsValue> {
     let current_level = Level::new(
         vec![
             vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            vec![1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1],
-            vec![1, 0, 2, 0, 2, 0, 1, 0, 2, 0, 2, 0, 1],
+            vec![1, 2, 0, 0, 0, 0, 1, 0, 0, 0, 0, 2, 1],
+            vec![1, 0, 0, 0, 2, 0, 1, 0, 2, 0, 0, 0, 1],
             vec![1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1],
             vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
             vec![1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1],
@@ -569,8 +539,8 @@ pub fn start() -> Result<(), JsValue> {
             vec![1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1],
             vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
             vec![1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1],
-            vec![1, 0, 2, 0, 2, 0, 1, 0, 2, 0, 2, 0, 1],
-            vec![1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1],
+            vec![1, 0, 0, 0, 2, 0, 1, 0, 2, 0, 0, 0, 1],
+            vec![1, 2, 0, 0, 0, 0, 1, 0, 0, 0, 0, 2, 1],
             vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         ],
         vec![
@@ -579,10 +549,7 @@ pub fn start() -> Result<(), JsValue> {
             Tile::new(2, true, false),
         ],
         vec![
-            Texture::new(
-                vec![vec![0, 0], vec![0, 0]],
-                vec![Color::new(255, 255, 255)],
-            ),
+            Texture::new(vec![vec![0, 0], vec![0, 0]], vec![Color::new(255, 255, 255)]),
             Texture::new(
                 vec![
                     vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
@@ -632,17 +599,11 @@ pub fn start() -> Result<(), JsValue> {
                 if pressed_key == 97 {
                     RESOLUTION_MULTIPLIER -= 1;
                     RESOLUTION_MULTIPLIER = RESOLUTION_MULTIPLIER.clamp(1, 32);
-                    console_log!(
-                        "RESOLUTION_MULTIPLIER changed to: {:?}",
-                        RESOLUTION_MULTIPLIER
-                    );
+                    console_log!("RESOLUTION_MULTIPLIER changed to: {:?}", RESOLUTION_MULTIPLIER);
                 } else if pressed_key == 98 {
                     RESOLUTION_MULTIPLIER += 1;
                     RESOLUTION_MULTIPLIER = RESOLUTION_MULTIPLIER.clamp(1, 32);
-                    console_log!(
-                        "RESOLUTION_MULTIPLIER changed to: {:?}",
-                        RESOLUTION_MULTIPLIER
-                    );
+                    console_log!("RESOLUTION_MULTIPLIER changed to: {:?}", RESOLUTION_MULTIPLIER);
                 }
                 if pressed_key == 99 {
                     FISH_EYE_CORRECTION = !FISH_EYE_CORRECTION;
@@ -666,12 +627,10 @@ pub fn start() -> Result<(), JsValue> {
     {
         let closure = Closure::wrap(Box::new(move |event: web_sys::MouseEvent| unsafe {
             if GAME_RUNNING {
-                PLAYER_CAMERA.rotation.degree +=
-                    ((event.movement_x() * 10) as f32) * MOVEMENT_SPEED_MODIFIER;
+                PLAYER_CAMERA.rotation.degree += ((event.movement_x() * 10) as f32) * MOVEMENT_SPEED_MODIFIER;
             }
         }) as Box<dyn FnMut(_)>);
-        game_cavas_html
-            .add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())?;
+        game_canvas_html.add_event_listener_with_callback("mousemove", closure.as_ref().unchecked_ref())?;
         closure.forget();
     }
     // Mouse click
@@ -693,8 +652,7 @@ pub fn start() -> Result<(), JsValue> {
                 POINTER_SHOULD_BE_LOCKED = true;
             }
         }) as Box<dyn FnMut(_)>);
-        game_cavas_html
-            .add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())?;
+        game_canvas_html.add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())?;
         closure.forget();
     }
     // Pointerlock exit
@@ -706,10 +664,7 @@ pub fn start() -> Result<(), JsValue> {
                 GAME_RUNNING = false;
             }
         }) as Box<dyn FnMut(_)>);
-        document.add_event_listener_with_callback(
-            "pointerlockchange",
-            closure.as_ref().unchecked_ref(),
-        )?;
+        document.add_event_listener_with_callback("pointerlockchange", closure.as_ref().unchecked_ref())?;
         closure.forget();
     }
     // Pointerlock error
@@ -718,10 +673,7 @@ pub fn start() -> Result<(), JsValue> {
             POINTER_SHOULD_BE_LOCKED = false;
             GAME_RUNNING = false;
         }) as Box<dyn FnMut(_)>);
-        document.add_event_listener_with_callback(
-            "pointerlockerror",
-            closure.as_ref().unchecked_ref(),
-        )?;
+        document.add_event_listener_with_callback("pointerlockerror", closure.as_ref().unchecked_ref())?;
         closure.forget();
     }
     // Game loop
@@ -729,8 +681,8 @@ pub fn start() -> Result<(), JsValue> {
         unsafe {
             SCREEN_WIDTH = window.inner_width().unwrap().as_f64().unwrap() as usize;
             SCREEN_HEIGHT = window.inner_height().unwrap().as_f64().unwrap() as usize;
-            game_cavas_html.set_width(SCREEN_WIDTH as u32);
-            game_cavas_html.set_height(SCREEN_HEIGHT as u32);
+            game_canvas_html.set_width(SCREEN_WIDTH as u32);
+            game_canvas_html.set_height(SCREEN_HEIGHT as u32);
 
             let mut buffer: Vec<u8> = vec![0; SCREEN_WIDTH * SCREEN_HEIGHT * 4];
 
