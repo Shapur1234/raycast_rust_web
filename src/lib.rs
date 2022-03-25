@@ -114,9 +114,8 @@ impl Texture {
         if (point.x >= 0.0 && point.x < (self.width as f32)) && (point.y >= 0.0 && point.y < (self.height as f32)) {
             &self.colors[self.layout[point.y as usize][point.x as usize]]
         }
-        // TODO FIX
         else {
-            &self.colors[self.layout[0][0]]
+            &self.colors[0]
         }
     }
 }
@@ -396,8 +395,7 @@ fn draw_walls_to_buffer(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
     let mut cast_distances: Vec<f32> = vec![];
     let mut cast_points: Vec<Point> = vec![];
 
-    let angles: Vec<Rotation> = camera.get_angles_to_cast();
-    for angle in angles {
+    for angle in camera.get_angles_to_cast() {
         let (cast_point, cast_distance) = cast_ray(&camera.pos, &angle, &level);
         cast_points.push(cast_point);
         cast_distances.push(
