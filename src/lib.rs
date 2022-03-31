@@ -8,7 +8,6 @@ static mut SCREEN_HEIGHT: usize = 0;
 
 static mut MOVEMENT_SPEED_MODIFIER: f32 = 0.05;
 static mut RESOLUTION_MULTIPLIER: u32 = 16;
-static mut FOV: u32 = 90;
 static mut FISH_EYE_CORRECTION: bool = true;
 
 static mut GAME_RUNNING: bool = false;
@@ -16,6 +15,7 @@ static mut POINTER_SHOULD_BE_LOCKED: bool = false;
 static mut PLAYER_CAMERA: Camera = Camera {
     pos: Point { x: 6.5, y: 7.5 },
     rotation: Rotation { degree: 0.0 },
+    fov: 90,
 };
 
 // --------------------------------------------------------------------------------
@@ -58,36 +58,23 @@ impl Rect {
     fn new() -> Rect {
         unimplemented!();
     }
-    fn fit_to_screen(&self) -> Rect {
+    fn fit_to_screen(&self, dest_width: usize, dest_height: usize) -> Rect {
         let mut rect_temp: Rect = *self;
 
-        if rect_temp.x >= unsafe { SCREEN_WIDTH } {
-            rect_temp.x = unsafe { SCREEN_WIDTH } - 1
+        if rect_temp.x >= dest_width {
+            rect_temp.x = dest_width - 1
         }
-        if rect_temp.y >= unsafe { SCREEN_HEIGHT } {
-            rect_temp.y = unsafe { SCREEN_HEIGHT } - 1
+        if rect_temp.y >= dest_height {
+            rect_temp.y = dest_height - 1
         }
-        if rect_temp.x + rect_temp.width >= unsafe { SCREEN_WIDTH } {
-            rect_temp.width = unsafe { SCREEN_WIDTH } - rect_temp.x
+        if rect_temp.x + rect_temp.width >= dest_width {
+            rect_temp.width = dest_width - rect_temp.x
         }
-        if rect_temp.y + rect_temp.height >= unsafe { SCREEN_HEIGHT } {
-            rect_temp.height = unsafe { SCREEN_HEIGHT } - rect_temp.y
+        if rect_temp.y + rect_temp.height >= dest_height {
+            rect_temp.height = dest_height - rect_temp.y
         }
 
         rect_temp
-    }
-    fn draw(&self, dest: &mut Vec<u8>) {
-        let rect_temp = self.fit_to_screen();
-
-        for y in 0..rect_temp.height {
-            for x in 0..rect_temp.width {
-                let pos: usize = (((rect_temp.y + y) * unsafe { SCREEN_WIDTH }) + rect_temp.x + x) * 4;
-                dest[pos + 0] = rect_temp.color.r;
-                dest[pos + 1] = rect_temp.color.g;
-                dest[pos + 2] = rect_temp.color.b;
-                dest[pos + 3] = 255;
-            }
-        }
     }
 }
 
@@ -113,8 +100,7 @@ impl Texture {
     fn get_color(&self, point: &Point) -> &Color {
         if (point.x >= 0.0 && point.x < (self.width as f32)) && (point.y >= 0.0 && point.y < (self.height as f32)) {
             &self.colors[self.layout[point.y as usize][point.x as usize]]
-        }
-        else {
+        } else {
             &self.colors[0]
         }
     }
@@ -217,6 +203,7 @@ struct InputInfo {
 struct Camera {
     pos: Point,
     rotation: Rotation,
+    fov: usize,
 }
 
 impl Camera {
@@ -224,12 +211,13 @@ impl Camera {
         Camera {
             pos: Point::new(pos.x, pos.y),
             rotation: Rotation::new(0.0),
+            fov: 90,
         }
     }
     fn get_angles_to_cast(&self) -> Vec<Rotation> {
         let mut output: Vec<Rotation> = Vec::new();
-        for i in (self.rotation.degree - (unsafe { FOV as f32 } / 2.0)) as i32
-            ..(self.rotation.degree + (unsafe { FOV as f32 } / 2.0)) as i32
+        for i in (self.rotation.degree - (self.fov as f32 / 2.0)) as i32
+            ..(self.rotation.degree + (self.fov as f32 / 2.0)) as i32
         {
             for x in 0..unsafe { RESOLUTION_MULTIPLIER } {
                 output.push(Rotation::new(
@@ -319,7 +307,7 @@ fn clamp_degrees(value: f32) -> f32 {
 
 // --------------------------------------------------------------------------------
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 struct Point {
     x: f32,
     y: f32,
@@ -333,113 +321,194 @@ impl Point {
 
 // --------------------------------------------------------------------------------
 
-fn draw_background(dest: &mut Vec<u8>) {
-    Rect {
-        x: 0,
-        y: 0,
-        width: unsafe { SCREEN_WIDTH },
-        height: unsafe { SCREEN_HEIGHT },
-        color: Color::new(0x4f, 0x4f, 0x4f),
-    }
-    .draw(dest);
+struct FrameBuffer {
+    buffer: Vec<u8>,
+    width: usize,
+    height: usize,
 }
-fn draw_minimap(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
-    const TILE_SIZE: usize = 16;
 
-    for y in 0..level.height {
-        for x in 0..level.width {
-            let tile_pos = &Point::new(x as f32, y as f32);
-            let tile = level.get_tile(tile_pos);
-            let texture = level.get_texture(tile_pos);
-            Rect {
-                x: unsafe { SCREEN_WIDTH } - ((x + 2) * TILE_SIZE),
-                y: (y + 1) * TILE_SIZE,
-                width: TILE_SIZE,
-                height: TILE_SIZE,
-                color: if !tile.transparent {
-                    texture.colors[0]
-                } else {
-                    Color::new(255, 255, 255)
-                },
+impl FrameBuffer {
+    fn new(width: usize, height: usize) -> FrameBuffer {
+        FrameBuffer {
+            width,
+            height,
+            buffer: vec![0; width * height * 4],
+        }
+    }
+    fn draw_pixel(&mut self, pos: Point, color: Color) {
+        if pos.x >= 0.0 && pos.x <= (self.width as f32) && pos.y >= 0.0 && pos.y <= (self.height as f32) {
+            let index: usize = (((pos.y as usize) * self.width) + (pos.x as usize)) * 4;
+
+            self.buffer[index + 0] = color.r;
+            self.buffer[index + 1] = color.g;
+            self.buffer[index + 2] = color.b;
+            self.buffer[index + 3] = 255;
+        }
+    }
+    fn draw_rect(&mut self, rect: Rect) {
+        let rect_temp = rect.fit_to_screen(self.width, self.height);
+
+        for y in 0..rect_temp.height {
+            for x in 0..rect_temp.width {
+                let pos: usize = (((rect_temp.y + y) * self.width) + rect_temp.x + x) * 4;
+                self.buffer[pos + 0] = rect_temp.color.r;
+                self.buffer[pos + 1] = rect_temp.color.g;
+                self.buffer[pos + 2] = rect_temp.color.b;
+                self.buffer[pos + 3] = 255;
             }
-            .draw(dest);
         }
     }
+    fn draw_line(&mut self, p0: Point, p1: Point, color: Color) {
+        let (dx, dy) = ((p0.x - p1.x).abs(), -(p0.y - p1.y).abs());
+        let (sx, sy) = (
+            (if p0.x < p1.x { 1.0 } else { -1.0 }),
+            (if p0.y < p1.y { 1.0 } else { -1.0 }),
+        );
+        let mut error = dx + dy;
 
-    if level.is_in_level(&camera.pos) {
-        Rect {
-            x: unsafe { SCREEN_WIDTH } - ((camera.pos.x + 1.0) * (TILE_SIZE as f32)) as usize - TILE_SIZE / 4,
-            y: ((camera.pos.y + 1.0) * (TILE_SIZE as f32)) as usize - TILE_SIZE / 4,
-            width: TILE_SIZE / 2,
-            height: TILE_SIZE / 2,
-            color: Color::new(255, 0, 0),
+        let mut point: Point = p0;
+        for _ in 0..(((self.width.pow(2) * self.height.pow(2)) as f32).powf(0.5) as usize) {
+            self.draw_pixel(point, color);
+
+            if point.x == p1.x && point.y == p1.y {
+                break;
+            }
+            if (error * 2.0) >= dy {
+                if point.x == p1.x {
+                    break;
+                }
+                error += dy;
+                point.x += sx;
+            }
+            if (error * 2.0) <= dx {
+                if point.y == p1.y {
+                    break;
+                }
+                error += dx;
+                point.y += sy;
+            }
         }
-        .draw(dest);
     }
-
-    let cast_result: Point = cast_ray(&camera.pos, &camera.rotation, level).0;
-    if level.is_in_level(&cast_result) {
-        Rect {
-            x: unsafe { SCREEN_WIDTH } - ((cast_result.x + 1.0) * (TILE_SIZE as f32)) as usize - TILE_SIZE / 8,
-            y: ((cast_result.y + 1.0) * (TILE_SIZE as f32)) as usize - TILE_SIZE / 8,
-            width: TILE_SIZE / 4,
-            height: TILE_SIZE / 4,
-            color: Color::new(0, 0, 255),
-        }
-        .draw(dest);
+    fn draw_background(&mut self) {
+        self.draw_rect(Rect {
+            x: 0,
+            y: 0,
+            width: self.width,
+            height: self.height,
+            color: Color::new(0x4f, 0x4f, 0x4f),
+        })
     }
-}
-fn draw_walls_to_buffer(dest: &mut Vec<u8>, camera: &Camera, level: &Level) {
-    let slice_width: f32 =
-        (unsafe { SCREEN_WIDTH } as f32) / ((unsafe { FOV } as f32) * (unsafe { RESOLUTION_MULTIPLIER } as f32));
-    let mut cast_distances: Vec<f32> = vec![];
-    let mut cast_points: Vec<Point> = vec![];
-
-    for angle in camera.get_angles_to_cast() {
-        let (cast_point, cast_distance) = cast_ray(&camera.pos, &angle, &level);
-        cast_points.push(cast_point);
-        cast_distances.push(
-            cast_distance
-                * if unsafe { FISH_EYE_CORRECTION } {
-                    (angle.degree - camera.rotation.degree).to_radians().cos()
-                } else {
-                    1.0
-                },
+    fn flip_to_canvas(&self, canvas: &web_sys::CanvasRenderingContext2d) {
+        canvas.put_image_data(
+            &web_sys::ImageData::new_with_u8_clamped_array(
+                wasm_bindgen::Clamped { 0: &self.buffer },
+                self.width as u32,
+            )
+            .unwrap(),
+            0.0,
+            0.0,
         );
     }
+    fn draw_minimap(&mut self, camera: &Camera, level: &Level) {
+        const TILE_SIZE: usize = 16;
 
-    let mut loop_count: usize = 0;
-    for wall_distance in cast_distances {
-        if !level.get_tile(&cast_points[loop_count]).transparent {
-            let wall_height: f32 = (unsafe { SCREEN_HEIGHT } as f32) / wall_distance;
-            let texture: &Texture = level.get_texture(&cast_points[loop_count]);
-            for i in 0..texture.height {
-                let vertical_slice_height: f32 = wall_height / (texture.height as f32);
-                Rect {
-                    x: (slice_width * (loop_count as f32)) as usize,
-                    y: (((unsafe { SCREEN_HEIGHT } as f32 - wall_height) / 2.0)
-                        + vertical_slice_height * (i as f32)
-                        + if texture.height >= 8 {
-                            vertical_slice_height / 2.0
-                        } else {
-                            0.0
-                        }) as usize,
-                    width: (slice_width + 1.0) as usize,
-                    height: (wall_height / (texture.height as f32)) as usize + 1,
-                    color: texture
-                        .get_color(&Point {
-                            x: ((cast_points[loop_count].x + cast_points[loop_count].y) * (texture.width as f32))
-                                % (texture.width as f32),
-                            y: i as f32,
-                        })
-                        .shade_distance(wall_distance),
-                }
-                .draw(dest);
+        for y in 0..level.height {
+            for x in 0..level.width {
+                let tile_pos = &Point::new(x as f32, y as f32);
+                let tile = level.get_tile(tile_pos);
+                let texture = level.get_texture(tile_pos);
+                self.draw_rect(Rect {
+                    x: self.width - ((x + 2) * TILE_SIZE),
+                    y: (y + 1) * TILE_SIZE,
+                    width: TILE_SIZE,
+                    height: TILE_SIZE,
+                    color: if !tile.transparent {
+                        texture.colors[0]
+                    } else {
+                        Color::new(255, 255, 255)
+                    },
+                })
             }
         }
-        loop_count += 1;
+
+        for angle in camera.get_angles_to_cast() {
+            let cast_result: Point = cast_ray(&camera.pos, &angle, level).0;
+            self.draw_line(
+                Point::new(
+                    (self.width - ((camera.pos.x + 1.0) * (TILE_SIZE as f32)) as usize) as f32,
+                    (((camera.pos.y + 1.0) * (TILE_SIZE as f32)) as usize) as f32,
+                ),
+                Point::new(
+                    (self.width - ((cast_result.x + 1.0) * (TILE_SIZE as f32)) as usize) as f32,
+                    (((cast_result.y + 1.0) * (TILE_SIZE as f32)) as usize) as f32,
+                ),
+                Color::new(0, 255, 0),
+            );
+        }
+
+        if level.is_in_level(&camera.pos) {
+            self.draw_rect(Rect {
+                x: self.width - ((camera.pos.x + 1.0) * (TILE_SIZE as f32)) as usize - TILE_SIZE / 4,
+                y: ((camera.pos.y + 1.0) * (TILE_SIZE as f32)) as usize - TILE_SIZE / 4,
+                width: TILE_SIZE / 2,
+                height: TILE_SIZE / 2,
+                color: Color::new(255, 0, 0),
+            })
+        }
+    }
+    fn draw_walls(&mut self, camera: &Camera, level: &Level) {
+        let slice_width: f32 = (self.width as f32) / ((camera.fov as f32) * (unsafe { RESOLUTION_MULTIPLIER } as f32));
+        let mut cast_distances: Vec<f32> = vec![];
+        let mut cast_points: Vec<Point> = vec![];
+
+        for angle in camera.get_angles_to_cast() {
+            let (cast_point, cast_distance) = cast_ray(&camera.pos, &angle, &level);
+            cast_points.push(cast_point);
+            cast_distances.push(
+                cast_distance
+                    * if unsafe { FISH_EYE_CORRECTION } {
+                        (angle.degree - camera.rotation.degree).to_radians().cos()
+                    } else {
+                        1.0
+                    },
+            );
+        }
+
+        let mut loop_count: usize = 0;
+        for wall_distance in cast_distances {
+            if !level.get_tile(&cast_points[loop_count]).transparent {
+                let wall_height: f32 = (self.height as f32) / wall_distance;
+                let texture: &Texture = level.get_texture(&cast_points[loop_count]);
+                for i in 0..texture.height {
+                    let vertical_slice_height: f32 = wall_height / (texture.height as f32);
+                    self.draw_rect(Rect {
+                        x: (slice_width * (loop_count as f32)) as usize,
+                        y: (((self.height as f32 - wall_height) / 2.0)
+                            + vertical_slice_height * (i as f32)
+                            + if texture.height >= 8 {
+                                vertical_slice_height / 2.0
+                            } else {
+                                0.0
+                            }) as usize,
+                        width: (slice_width + 1.0) as usize,
+                        height: (wall_height / (texture.height as f32)) as usize + 1,
+                        color: texture
+                            .get_color(&Point {
+                                x: ((cast_points[loop_count].x + cast_points[loop_count].y) * (texture.width as f32))
+                                    % (texture.width as f32),
+                                y: i as f32,
+                            })
+                            .shade_distance(wall_distance),
+                    })
+                }
+            }
+            loop_count += 1;
+        }
     }
 }
+
+// --------------------------------------------------------------------------------
+
 fn cast_ray(pos: &Point, rotation: &Rotation, level: &Level) -> (Point, f32) {
     let ray_dir: (f32, f32) = (rotation.degree.to_radians().cos(), rotation.degree.to_radians().sin());
     let mut map_pos: (i32, i32) = (pos.x as i32, pos.y as i32);
@@ -464,7 +533,7 @@ fn cast_ray(pos: &Point, rotation: &Rotation, level: &Level) -> (Point, f32) {
         side_dist.1 = (((map_pos.1 + 1) as f32) - pos.y) * delta_dist.1;
     }
 
-    for _ in 0..1000 {
+    for _ in 0..100 {
         if side_dist.0 < side_dist.1 {
             side_dist.0 += delta_dist.0;
             map_pos.0 += step.0;
@@ -491,15 +560,6 @@ fn cast_ray(pos: &Point, rotation: &Rotation, level: &Level) -> (Point, f32) {
         Point::new(pos.x + (ray_dir.0 * distance), pos.y + (ray_dir.1 * distance)),
         distance,
     )
-}
-fn draw_buffer_to_canvas(buffer: Vec<u8>, dest: &web_sys::CanvasRenderingContext2d) {
-    dest.put_image_data(
-        &web_sys::ImageData::new_with_u8_clamped_array(wasm_bindgen::Clamped { 0: &buffer }, unsafe { SCREEN_WIDTH }
-            as u32)
-        .unwrap(),
-        0.0,
-        0.0,
-    );
 }
 
 #[wasm_bindgen(start)]
@@ -608,13 +668,13 @@ pub fn start() -> Result<(), JsValue> {
                 }
 
                 if pressed_key == 100 {
-                    FOV -= 1;
-                    FOV = FOV.clamp(4, 180);
-                    console_log!("FOV changed to: {:?}", FOV);
+                    PLAYER_CAMERA.fov -= 1;
+                    PLAYER_CAMERA.fov = PLAYER_CAMERA.fov.clamp(4, 180);
+                    console_log!("FOV changed to: {:?}", PLAYER_CAMERA.fov);
                 } else if pressed_key == 101 {
-                    FOV += 1;
-                    FOV = FOV.clamp(4, 180);
-                    console_log!("FOV changed to: {:?}", FOV);
+                    PLAYER_CAMERA.fov += 1;
+                    PLAYER_CAMERA.fov = PLAYER_CAMERA.fov.clamp(4, 180);
+                    console_log!("FOV changed to: {:?}", PLAYER_CAMERA.fov);
                 }
             }
         }) as Box<dyn FnMut(_)>);
@@ -676,19 +736,23 @@ pub fn start() -> Result<(), JsValue> {
     }
     // Game loop
     *g.borrow_mut() = Some(Closure::wrap(Box::new(move || {
-        unsafe {
-            SCREEN_WIDTH = window.inner_width().unwrap().as_f64().unwrap() as usize;
-            SCREEN_HEIGHT = window.inner_height().unwrap().as_f64().unwrap() as usize;
-            game_canvas_html.set_width(SCREEN_WIDTH as u32);
-            game_canvas_html.set_height(SCREEN_HEIGHT as u32);
+        {
+            // TODO: Make into event
+            {
+                unsafe {
+                    SCREEN_WIDTH = window.inner_width().unwrap().as_f64().unwrap() as usize;
+                    SCREEN_HEIGHT = window.inner_height().unwrap().as_f64().unwrap() as usize;
+                }
+                game_canvas_html.set_width(unsafe { SCREEN_WIDTH } as u32);
+                game_canvas_html.set_height(unsafe { SCREEN_HEIGHT } as u32);
+            }
+            let mut frame_buffer: FrameBuffer = FrameBuffer::new(unsafe { SCREEN_WIDTH }, unsafe { SCREEN_HEIGHT });
 
-            let mut buffer: Vec<u8> = vec![0; SCREEN_WIDTH * SCREEN_HEIGHT * 4];
+            frame_buffer.draw_background();
+            frame_buffer.draw_walls(unsafe { &PLAYER_CAMERA }, &current_level);
+            frame_buffer.draw_minimap(unsafe { &PLAYER_CAMERA }, &current_level);
 
-            draw_background(&mut buffer);
-            draw_walls_to_buffer(&mut buffer, &PLAYER_CAMERA, &current_level);
-            draw_minimap(&mut buffer, &PLAYER_CAMERA, &current_level);
-
-            draw_buffer_to_canvas(buffer, &game_canvas);
+            frame_buffer.flip_to_canvas(&game_canvas);
         }
         request_animation_frame(f.borrow().as_ref().unwrap());
     }) as Box<dyn FnMut()>));
