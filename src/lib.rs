@@ -7,15 +7,14 @@ static mut SCREEN_WIDTH: usize = 0;
 static mut SCREEN_HEIGHT: usize = 0;
 
 static mut MOVEMENT_SPEED_MODIFIER: f32 = 0.05;
-static mut RESOLUTION_MULTIPLIER: u32 = 16;
-static mut FISH_EYE_CORRECTION: bool = true;
-
 static mut GAME_RUNNING: bool = false;
 static mut POINTER_SHOULD_BE_LOCKED: bool = false;
 static mut PLAYER_CAMERA: Camera = Camera {
     pos: Point { x: 6.5, y: 7.5 },
     rotation: Rotation { degree: 0.0 },
     fov: 90,
+    resolution_multiplier: 16,
+    fish_eye_correction: true,
 };
 
 // --------------------------------------------------------------------------------
@@ -203,7 +202,9 @@ struct InputInfo {
 struct Camera {
     pos: Point,
     rotation: Rotation,
-    fov: usize,
+    fov: u8,
+    resolution_multiplier: u8,
+    fish_eye_correction: bool,
 }
 
 impl Camera {
@@ -212,6 +213,8 @@ impl Camera {
             pos: Point::new(pos.x, pos.y),
             rotation: Rotation::new(0.0),
             fov: 90,
+            resolution_multiplier: 16,
+            fish_eye_correction: true,
         }
     }
     fn get_angles_to_cast(&self) -> Vec<Rotation> {
@@ -219,9 +222,9 @@ impl Camera {
         for i in (self.rotation.degree - (self.fov as f32 / 2.0)) as i32
             ..(self.rotation.degree + (self.fov as f32 / 2.0)) as i32
         {
-            for x in 0..unsafe { RESOLUTION_MULTIPLIER } {
+            for x in 0..self.resolution_multiplier {
                 output.push(Rotation::new(
-                    (i as f32) + ((1.0 / unsafe { RESOLUTION_MULTIPLIER } as f32) * (x as f32)),
+                    (i as f32) + ((1.0 / (self.resolution_multiplier as f32)) * (x as f32)),
                 ));
             }
         }
@@ -457,7 +460,7 @@ impl FrameBuffer {
         }
     }
     fn draw_walls(&mut self, camera: &Camera, level: &Level) {
-        let slice_width: f32 = (self.width as f32) / ((camera.fov as f32) * (unsafe { RESOLUTION_MULTIPLIER } as f32));
+        let slice_width: f32 = (self.width as f32) / ((camera.fov as f32) * (camera.resolution_multiplier as f32));
         let mut cast_distances: Vec<f32> = vec![];
         let mut cast_points: Vec<Point> = vec![];
 
@@ -466,7 +469,7 @@ impl FrameBuffer {
             cast_points.push(cast_point);
             cast_distances.push(
                 cast_distance
-                    * if unsafe { FISH_EYE_CORRECTION } {
+                    * if camera.fish_eye_correction {
                         (angle.degree - camera.rotation.degree).to_radians().cos()
                     } else {
                         1.0
@@ -655,16 +658,22 @@ pub fn start() -> Result<(), JsValue> {
                 );
 
                 if pressed_key == 97 {
-                    RESOLUTION_MULTIPLIER -= 1;
-                    RESOLUTION_MULTIPLIER = RESOLUTION_MULTIPLIER.clamp(1, 32);
-                    console_log!("RESOLUTION_MULTIPLIER changed to: {:?}", RESOLUTION_MULTIPLIER);
+                    PLAYER_CAMERA.resolution_multiplier -= 1;
+                    PLAYER_CAMERA.resolution_multiplier = PLAYER_CAMERA.resolution_multiplier.clamp(1, 32);
+                    console_log!(
+                        "PLAYER_CAMERA.resolution_multiplier changed to: {:?}",
+                        PLAYER_CAMERA.resolution_multiplier
+                    );
                 } else if pressed_key == 98 {
-                    RESOLUTION_MULTIPLIER += 1;
-                    RESOLUTION_MULTIPLIER = RESOLUTION_MULTIPLIER.clamp(1, 32);
-                    console_log!("RESOLUTION_MULTIPLIER changed to: {:?}", RESOLUTION_MULTIPLIER);
+                    PLAYER_CAMERA.resolution_multiplier += 1;
+                    PLAYER_CAMERA.resolution_multiplier = PLAYER_CAMERA.resolution_multiplier.clamp(1, 32);
+                    console_log!(
+                        "PLAYER_CAMERA.resolution_multiplier changed to: {:?}",
+                        PLAYER_CAMERA.resolution_multiplier
+                    );
                 }
                 if pressed_key == 99 {
-                    FISH_EYE_CORRECTION = !FISH_EYE_CORRECTION;
+                    PLAYER_CAMERA.fish_eye_correction = !PLAYER_CAMERA.fish_eye_correction;
                 }
 
                 if pressed_key == 100 {
@@ -693,8 +702,8 @@ pub fn start() -> Result<(), JsValue> {
     }
     // Mouse click
     {
-        let closure = Closure::wrap(Box::new(move |_event: web_sys::MouseEvent| unsafe {
-            if !GAME_RUNNING {
+        let closure = Closure::wrap(Box::new(move |_event: web_sys::MouseEvent| {
+            if !unsafe { GAME_RUNNING } {
                 web_sys::window()
                     .unwrap()
                     .document()
@@ -706,8 +715,10 @@ pub fn start() -> Result<(), JsValue> {
                     .unwrap()
                     .request_pointer_lock();
 
-                GAME_RUNNING = true;
-                POINTER_SHOULD_BE_LOCKED = true;
+                unsafe {
+                    GAME_RUNNING = true;
+                    POINTER_SHOULD_BE_LOCKED = true;
+                }
             }
         }) as Box<dyn FnMut(_)>);
         game_canvas_html.add_event_listener_with_callback("mousedown", closure.as_ref().unchecked_ref())?;
