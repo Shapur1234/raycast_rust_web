@@ -1,0 +1,12 @@
+/home/jirka/Programming/raycast_rust/texture_parser/target/debug/deps/half-8f2cf579537164df.rmeta: /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/lib.rs /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/bfloat.rs /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/bfloat/convert.rs /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/binary16.rs /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/binary16/convert.rs /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/slice.rs
+
+/home/jirka/Programming/raycast_rust/texture_parser/target/debug/deps/libhalf-8f2cf579537164df.rlib: /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/lib.rs /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/bfloat.rs /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/bfloat/convert.rs /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/binary16.rs /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/binary16/convert.rs /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/slice.rs
+
+/home/jirka/Programming/raycast_rust/texture_parser/target/debug/deps/half-8f2cf579537164df.d: /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/lib.rs /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/bfloat.rs /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/bfloat/convert.rs /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/binary16.rs /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/binary16/convert.rs /home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/slice.rs
+
+/home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/lib.rs:
+/home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/bfloat.rs:
+/home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/bfloat/convert.rs:
+/home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/binary16.rs:
+/home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/binary16/convert.rs:
+/home/jirka/.cargo/registry/src/github.com-1ecc6299db9ec823/half-1.8.2/src/slice.rs:

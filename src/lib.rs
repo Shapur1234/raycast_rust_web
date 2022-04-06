@@ -1,3 +1,5 @@
+mod texture_consts;
+
 use std::cell::RefCell;
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
@@ -19,6 +21,11 @@ static mut PLAYER_CAMERA: Camera = Camera {
 
 // --------------------------------------------------------------------------------
 
+#[macro_use(c)]
+extern crate cute;
+
+// --------------------------------------------------------------------------------
+
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_namespace = console)]
@@ -32,9 +39,8 @@ extern "C" {
 }
 
 macro_rules! console_log {
-        ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
-    }
-
+    ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
+}
 fn request_animation_frame(f: &Closure<dyn FnMut()>) {
     web_sys::window()
         .expect("no global `window` exists")
@@ -83,24 +89,85 @@ impl Rect {
 struct Texture {
     width: usize,
     height: usize,
-    layout: Vec<Vec<usize>>,
-    colors: Vec<Color>,
+    layout: Vec<Color>,
 }
 
 impl Texture {
-    fn new(layout_input: Vec<Vec<usize>>, layout_color: Vec<Color>) -> Texture {
+    fn new(id: String) -> Texture {
+        // let canvas = web_sys::window()
+        //     .unwrap()
+        //     .document()
+        //     .unwrap()
+        //     .create_element("canvas")
+        //     .unwrap()
+        //     .dyn_into::<web_sys::HtmlCanvasElement>()
+        //     .map_err(|_| ())
+        //     .unwrap()
+        //     .get_context("2d")
+        //     .unwrap()
+        //     .unwrap()
+        //     .dyn_into::<web_sys::CanvasRenderingContext2d>()
+        //     .unwrap();
+        // let image = web_sys::window()
+        //     .unwrap()
+        //     .document()
+        //     .unwrap()
+        //     .get_element_by_id(id.as_str())
+        //     .unwrap()
+        //     .dyn_into::<web_sys::HtmlImageElement>()
+        //     .map_err(|_| ())
+        //     .unwrap();
+        // match canvas.draw_image_with_html_image_element(&image, image.width() as f64, image.height() as f64) {
+        //     Ok(_) => {}
+        //     Err(e) => console_log!("Error drawing image element to canvas: {:?}", e),
+        // }
+        // let pixel_array: Vec<u8> = match canvas.get_image_data(0.0, 0.0, image.width() as f64, image.height() as f64) {
+        //     Ok(v) => v.data().0,
+        //     Err(e) => {
+        //         console_log!("Error getting image_data from canvas: {:?}", e);
+        //         vec![0, 0, 0, 0]
+        //     }
+        // };
+
+        // let game_canvas = web_sys::window()
+        //     .unwrap()
+        //     .document()
+        //     .unwrap()
+        //     .get_element_by_id("game_canvas")
+        //     .unwrap()
+        //     .dyn_into::<web_sys::HtmlCanvasElement>()
+        //     .map_err(|_| ())
+        //     .unwrap()
+        //     .get_context("2d")
+        //     .unwrap()
+        //     .unwrap()
+        //     .dyn_into::<web_sys::CanvasRenderingContext2d>()
+        //     .unwrap();
+        // game_canvas.put_image_data(&canvas.get_image_data(0.0, 0.0, image.width() as f64, image.height() as f64).unwrap(), 0.0, 0.0);
+        // let pixel_array: Vec<u8> = canvas.get_image_data(0.0, 0.0, image.width() as f64, image.height() as f64).unwrap().data().0;
+        // Texture {
+        //     width: image.width() as usize,
+        //     height: image.height() as usize,
+        //     layout: vec_u8_to_vec_color(pixel_array),
+        // }
         Texture {
-            width: layout_input[0].len(),
-            height: layout_input.len(),
-            layout: layout_input,
-            colors: layout_color,
+            width: 80,
+            height: 80,
+            layout: vec_u8_to_vec_color(texture_consts::BRICK_TEXTURE.to_vec()),
+        }
+    }
+    fn new_blank() -> Texture {
+        Texture {
+            width: 1,
+            height: 1,
+            layout: vec![Color::new(0, 0, 0)],
         }
     }
     fn get_color(&self, point: &Point) -> &Color {
         if (point.x >= 0.0 && point.x < (self.width as f32)) && (point.y >= 0.0 && point.y < (self.height as f32)) {
-            &self.colors[self.layout[point.y as usize][point.x as usize]]
+            &self.layout[(self.width * (point.y as usize)) + (point.x as usize)]
         } else {
-            &self.colors[0]
+            &self.layout[0]
         }
     }
 }
@@ -402,7 +469,7 @@ impl FrameBuffer {
         })
     }
     fn flip_to_canvas(&self, canvas: &web_sys::CanvasRenderingContext2d) {
-        canvas.put_image_data(
+        match canvas.put_image_data(
             &web_sys::ImageData::new_with_u8_clamped_array(
                 wasm_bindgen::Clamped { 0: &self.buffer },
                 self.width as u32,
@@ -410,7 +477,10 @@ impl FrameBuffer {
             .unwrap(),
             0.0,
             0.0,
-        );
+        ) {
+            Ok(_) => {}
+            Err(e) => console_log!("Error drawing FrameBuffer to canvas: {:?}", e),
+        }
     }
     fn draw_minimap(&mut self, camera: &Camera, level: &Level) {
         const TILE_SIZE: usize = 16;
@@ -426,7 +496,7 @@ impl FrameBuffer {
                     width: TILE_SIZE,
                     height: TILE_SIZE,
                     color: if !tile.transparent {
-                        texture.colors[0]
+                        texture.layout[0]
                     } else {
                         Color::new(255, 255, 255)
                     },
@@ -565,6 +635,10 @@ fn cast_ray(pos: &Point, rotation: &Rotation, level: &Level) -> (Point, f32) {
     )
 }
 
+fn vec_u8_to_vec_color(pixels: Vec<u8>) -> Vec<Color> {
+    c![Color::new(pixels[i * 4 + 0], pixels[i * 4 + 1], pixels[i * 4 + 2]), for i in 0..(pixels.len() / 4)]
+}
+
 #[wasm_bindgen(start)]
 pub fn start() -> Result<(), JsValue> {
     let f = Rc::new(RefCell::new(None));
@@ -610,35 +684,12 @@ pub fn start() -> Result<(), JsValue> {
             Tile::new(2, true, false),
         ],
         vec![
-            Texture::new(vec![vec![0, 0], vec![0, 0]], vec![Color::new(255, 255, 255)]),
-            Texture::new(
-                vec![
-                    vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-                    vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-                    vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-                    vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                    vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-                    vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-                    vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-                    vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                    vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-                    vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-                    vec![0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-                    vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                    vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-                    vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-                    vec![0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-                    vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                ],
-                vec![Color::new(205, 84, 75), Color::new(123, 46, 47)],
-            ),
-            Texture::new(
-                vec![vec![0, 1], vec![1, 0]],
-                vec![Color::new(0, 255, 255), Color::new(255, 255, 0)],
-            ),
+            Texture::new_blank(),
+            Texture::new(String::from("brick_wall")),
+            Texture::new(String::from("brick_wall")),
         ],
     );
-
+    // console_log!("{:?}", Texture::new(String::from("brick_wall")));
     // Keyboard input
     {
         let current_level_2 = current_level.clone();
