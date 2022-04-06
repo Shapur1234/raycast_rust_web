@@ -224,8 +224,8 @@ struct InputInfo {
 struct Camera {
     pos: Point,
     rotation: Rotation,
-    fov: u8,
-    resolution_multiplier: u8,
+    fov: u32,
+    resolution_multiplier: u32,
     fish_eye_correction: bool,
 }
 
@@ -238,6 +238,12 @@ impl Camera {
             resolution_multiplier: 16,
             fish_eye_correction: true,
         }
+    }
+    fn mod_fov(&mut self, value: i32) {
+        self.fov = (((self.fov as i32) + value) as u32).clamp(1, 180);
+    }
+    fn mod_resolution_multiplier(&mut self, value: i32) {
+        self.resolution_multiplier = (((self.resolution_multiplier as i32) + value) as u32).clamp(1, 16);
     }
     fn get_angles_to_cast(&self) -> Vec<Rotation> {
         let mut output: Vec<Rotation> = Vec::new();
@@ -667,15 +673,13 @@ pub fn start() -> Result<(), JsValue> {
                 );
 
                 if pressed_key == 97 {
-                    PLAYER_CAMERA.resolution_multiplier -= 1;
-                    PLAYER_CAMERA.resolution_multiplier = PLAYER_CAMERA.resolution_multiplier.clamp(1, 32);
+                    PLAYER_CAMERA.mod_resolution_multiplier(-1);
                     console_log!(
                         "PLAYER_CAMERA.resolution_multiplier changed to: {:?}",
                         PLAYER_CAMERA.resolution_multiplier
                     );
                 } else if pressed_key == 98 {
-                    PLAYER_CAMERA.resolution_multiplier += 1;
-                    PLAYER_CAMERA.resolution_multiplier = PLAYER_CAMERA.resolution_multiplier.clamp(1, 32);
+                    PLAYER_CAMERA.mod_resolution_multiplier(1);
                     console_log!(
                         "PLAYER_CAMERA.resolution_multiplier changed to: {:?}",
                         PLAYER_CAMERA.resolution_multiplier
@@ -686,12 +690,10 @@ pub fn start() -> Result<(), JsValue> {
                 }
 
                 if pressed_key == 100 {
-                    PLAYER_CAMERA.fov -= 1;
-                    PLAYER_CAMERA.fov = PLAYER_CAMERA.fov.clamp(4, 180);
+                    PLAYER_CAMERA.mod_fov(-1);
                     console_log!("FOV changed to: {:?}", PLAYER_CAMERA.fov);
                 } else if pressed_key == 101 {
-                    PLAYER_CAMERA.fov += 1;
-                    PLAYER_CAMERA.fov = PLAYER_CAMERA.fov.clamp(4, 180);
+                    PLAYER_CAMERA.mod_fov(1);
                     console_log!("FOV changed to: {:?}", PLAYER_CAMERA.fov);
                 }
             }
