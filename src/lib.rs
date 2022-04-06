@@ -86,7 +86,7 @@ impl Rect {
 // --------------------------------------------------------------------------------
 
 enum Textures {
-    Blank, 
+    Blank,
     BrickWall,
     Richardo,
 }
@@ -100,23 +100,23 @@ struct Texture {
 
 impl Texture {
     fn new(id: Textures) -> Texture {
-       match id {
-        Textures::Blank => Texture {
-            width: texture_consts::BLANK.0,
-            height: texture_consts::BLANK.1,
-            layout:  vec_u8_to_vec_color_with_trans(texture_consts::BLANK.2.to_vec()),
-        },
-        Textures::BrickWall => Texture {
-            width: texture_consts::BRICK_WALL.0,
-            height: texture_consts::BRICK_WALL.1,
-            layout:  vec_u8_to_vec_color_with_trans(texture_consts::BRICK_WALL.2.to_vec()),
-        },
-        Textures::Richardo => Texture {
-            width: texture_consts::RICHARDO.0,
-            height: texture_consts::RICHARDO.1,
-            layout:  vec_u8_to_vec_color(texture_consts::RICHARDO.2.to_vec()),
-        },
-       }
+        match id {
+            Textures::Blank => Texture {
+                width: texture_consts::BLANK.0,
+                height: texture_consts::BLANK.1,
+                layout: vec_u8_to_vec_color_with_trans(texture_consts::BLANK.2.to_vec()),
+            },
+            Textures::BrickWall => Texture {
+                width: texture_consts::BRICK_WALL.0,
+                height: texture_consts::BRICK_WALL.1,
+                layout: vec_u8_to_vec_color(texture_consts::BRICK_WALL.2.to_vec()),
+            },
+            Textures::Richardo => Texture {
+                width: texture_consts::RICHARDO.0,
+                height: texture_consts::RICHARDO.1,
+                layout: vec_u8_to_vec_color(texture_consts::RICHARDO.2.to_vec()),
+            },
+        }
     }
     fn get_color(&self, point: &Point) -> &Color {
         if (point.x >= 0.0 && point.x < (self.width as f32)) && (point.y >= 0.0 && point.y < (self.height as f32)) {
@@ -598,7 +598,6 @@ fn vec_u8_to_vec_color(pixels: Vec<u8>) -> Vec<Color> {
     c![Color::new(pixels[i * 3], pixels[i * 3 + 1], pixels[i * 3 + 2]), for i in 0..(pixels.len() / 3)]
 }
 
-
 #[wasm_bindgen(start)]
 pub fn start() -> Result<(), JsValue> {
     let f = Rc::new(RefCell::new(None));
@@ -649,7 +648,6 @@ pub fn start() -> Result<(), JsValue> {
             Texture::new(Textures::Richardo),
         ],
     );
-    // console_log!("{:?}", Texture::new(String::from("BrickWall")));
     // Keyboard input
     {
         let current_level_2 = current_level.clone();
