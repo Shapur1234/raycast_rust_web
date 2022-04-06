@@ -3,7 +3,7 @@ use std::io::prelude::*;
 use std::path::Path;
 
 fn main() -> std::io::Result<()> {
-    let im = image::open(&Path::new("brick_wall.png")).unwrap();
+    let im = image::open(&Path::new("textures/richardo.jpeg")).unwrap();
     // println!("{:?}", im.as_bytes().len());
 
     let mut file = File::create("out.txt")?;

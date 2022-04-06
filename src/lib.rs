@@ -15,7 +15,7 @@ static mut PLAYER_CAMERA: Camera = Camera {
     pos: Point { x: 6.5, y: 7.5 },
     rotation: Rotation { degree: 0.0 },
     fov: 90,
-    resolution_multiplier: 16,
+    resolution_multiplier: 8,
     fish_eye_correction: true,
 };
 
@@ -85,6 +85,12 @@ impl Rect {
 
 // --------------------------------------------------------------------------------
 
+enum Textures {
+    Blank, 
+    BrickWall,
+    Richardo,
+}
+
 #[derive(Debug, Clone)]
 struct Texture {
     width: usize,
@@ -93,75 +99,24 @@ struct Texture {
 }
 
 impl Texture {
-    fn new(id: String) -> Texture {
-        // let canvas = web_sys::window()
-        //     .unwrap()
-        //     .document()
-        //     .unwrap()
-        //     .create_element("canvas")
-        //     .unwrap()
-        //     .dyn_into::<web_sys::HtmlCanvasElement>()
-        //     .map_err(|_| ())
-        //     .unwrap()
-        //     .get_context("2d")
-        //     .unwrap()
-        //     .unwrap()
-        //     .dyn_into::<web_sys::CanvasRenderingContext2d>()
-        //     .unwrap();
-        // let image = web_sys::window()
-        //     .unwrap()
-        //     .document()
-        //     .unwrap()
-        //     .get_element_by_id(id.as_str())
-        //     .unwrap()
-        //     .dyn_into::<web_sys::HtmlImageElement>()
-        //     .map_err(|_| ())
-        //     .unwrap();
-        // match canvas.draw_image_with_html_image_element(&image, image.width() as f64, image.height() as f64) {
-        //     Ok(_) => {}
-        //     Err(e) => console_log!("Error drawing image element to canvas: {:?}", e),
-        // }
-        // let pixel_array: Vec<u8> = match canvas.get_image_data(0.0, 0.0, image.width() as f64, image.height() as f64) {
-        //     Ok(v) => v.data().0,
-        //     Err(e) => {
-        //         console_log!("Error getting image_data from canvas: {:?}", e);
-        //         vec![0, 0, 0, 0]
-        //     }
-        // };
-
-        // let game_canvas = web_sys::window()
-        //     .unwrap()
-        //     .document()
-        //     .unwrap()
-        //     .get_element_by_id("game_canvas")
-        //     .unwrap()
-        //     .dyn_into::<web_sys::HtmlCanvasElement>()
-        //     .map_err(|_| ())
-        //     .unwrap()
-        //     .get_context("2d")
-        //     .unwrap()
-        //     .unwrap()
-        //     .dyn_into::<web_sys::CanvasRenderingContext2d>()
-        //     .unwrap();
-        // game_canvas.put_image_data(&canvas.get_image_data(0.0, 0.0, image.width() as f64, image.height() as f64).unwrap(), 0.0, 0.0);
-        // let pixel_array: Vec<u8> = canvas.get_image_data(0.0, 0.0, image.width() as f64, image.height() as f64).unwrap().data().0;
-        // Texture {
-        //     width: image.width() as usize,
-        //     height: image.height() as usize,
-        //     layout: vec_u8_to_vec_color(pixel_array),
-        // }
-        Texture {
-            width: 80,
-            height: 80,
-            layout: vec_u8_to_vec_color(texture_consts::BRICK_TEXTURE.to_vec()),
-        }
-    }
-    fn new_blank() -> Texture {
-        Texture {
-            width: 1,
-            height: 1,
-            layout: vec![Color::new(0, 0, 0)],
-        }
+    fn new(id: Textures) -> Texture {
+       match id {
+        Textures::Blank => Texture {
+            width: texture_consts::BLANK.0,
+            height: texture_consts::BLANK.1,
+            layout:  vec_u8_to_vec_color_with_trans(texture_consts::BLANK.2.to_vec()),
+        },
+        Textures::BrickWall => Texture {
+            width: texture_consts::BRICK_WALL.0,
+            height: texture_consts::BRICK_WALL.1,
+            layout:  vec_u8_to_vec_color_with_trans(texture_consts::BRICK_WALL.2.to_vec()),
+        },
+        Textures::Richardo => Texture {
+            width: texture_consts::RICHARDO.0,
+            height: texture_consts::RICHARDO.1,
+            layout:  vec_u8_to_vec_color(texture_consts::RICHARDO.2.to_vec()),
+        },
+       }
     }
     fn get_color(&self, point: &Point) -> &Color {
         if (point.x >= 0.0 && point.x < (self.width as f32)) && (point.y >= 0.0 && point.y < (self.height as f32)) {
@@ -635,9 +590,14 @@ fn cast_ray(pos: &Point, rotation: &Rotation, level: &Level) -> (Point, f32) {
     )
 }
 
-fn vec_u8_to_vec_color(pixels: Vec<u8>) -> Vec<Color> {
-    c![Color::new(pixels[i * 4 + 0], pixels[i * 4 + 1], pixels[i * 4 + 2]), for i in 0..(pixels.len() / 4)]
+fn vec_u8_to_vec_color_with_trans(pixels: Vec<u8>) -> Vec<Color> {
+    c![Color::new(pixels[i * 4], pixels[i * 4 + 1], pixels[i * 4 + 2]), for i in 0..(pixels.len() / 4)]
 }
+
+fn vec_u8_to_vec_color(pixels: Vec<u8>) -> Vec<Color> {
+    c![Color::new(pixels[i * 3], pixels[i * 3 + 1], pixels[i * 3 + 2]), for i in 0..(pixels.len() / 3)]
+}
+
 
 #[wasm_bindgen(start)]
 pub fn start() -> Result<(), JsValue> {
@@ -684,12 +644,12 @@ pub fn start() -> Result<(), JsValue> {
             Tile::new(2, true, false),
         ],
         vec![
-            Texture::new_blank(),
-            Texture::new(String::from("brick_wall")),
-            Texture::new(String::from("brick_wall")),
+            Texture::new(Textures::Blank),
+            Texture::new(Textures::BrickWall),
+            Texture::new(Textures::Richardo),
         ],
     );
-    // console_log!("{:?}", Texture::new(String::from("brick_wall")));
+    // console_log!("{:?}", Texture::new(String::from("BrickWall")));
     // Keyboard input
     {
         let current_level_2 = current_level.clone();
