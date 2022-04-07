@@ -5,6 +5,9 @@ use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
+const TEXTURE_WIDTH: usize = 256;
+const TEXTURE_HEIGHT: usize = 256;
+
 static mut SCREEN_WIDTH: usize = 0;
 static mut SCREEN_HEIGHT: usize = 0;
 
@@ -16,7 +19,7 @@ static mut PLAYER_CAMERA: Camera = Camera {
     rotation: Rotation { degree: 0.0 },
     fov: 90,
     resolution_multiplier: 8,
-    fish_eye_correction: true,
+    fish_eye_correction: false,
 };
 
 // --------------------------------------------------------------------------------
@@ -89,6 +92,7 @@ enum Textures {
     Blank,
     BrickWall,
     Richardo,
+    Wood,
 }
 
 #[derive(Debug, Clone)]
@@ -115,6 +119,11 @@ impl Texture {
                 width: texture_consts::RICHARDO.0,
                 height: texture_consts::RICHARDO.1,
                 layout: vec_u8_to_vec_color(texture_consts::RICHARDO.2.to_vec()),
+            },
+            Textures::Wood => Texture {
+                width: texture_consts::WOOD.0,
+                height: texture_consts::WOOD.1,
+                layout: vec_u8_to_vec_color(texture_consts::WOOD.2.to_vec()),
             },
         }
     }
@@ -184,9 +193,9 @@ impl Color {
     }
     fn shade_distance(&self, distance: f32) -> Color {
         Color::new(
-            ((self.r as f32 / (distance.powf(0.8))) as u8).clamp(self.r / 16, self.r),
-            ((self.g as f32 / (distance.powf(0.8))) as u8).clamp(self.g / 16, self.g),
-            ((self.b as f32 / (distance.powf(0.8))) as u8).clamp(self.b / 16, self.b),
+            ((self.r as f32 / distance) as u8).clamp(self.r / 16, self.r),
+            ((self.g as f32 / distance) as u8).clamp(self.g / 16, self.g),
+            ((self.b as f32 / distance) as u8).clamp(self.b / 16, self.b),
         )
     }
 }
@@ -367,7 +376,7 @@ impl FrameBuffer {
         }
     }
     fn draw_pixel(&mut self, pos: Point, color: Color) {
-        if pos.x >= 0.0 && pos.x <= (self.width as f32) && pos.y >= 0.0 && pos.y <= (self.height as f32) {
+        if pos.x >= 0.0 && pos.x < (self.width as f32) && pos.y >= 0.0 && pos.y < (self.height as f32) {
             let index: usize = (((pos.y as usize) * self.width) + (pos.x as usize)) * 4;
 
             self.buffer[index + 0] = color.r;
@@ -420,14 +429,70 @@ impl FrameBuffer {
             }
         }
     }
-    fn draw_background(&mut self) {
-        self.draw_rect(Rect {
-            x: 0,
-            y: 0,
-            width: self.width,
-            height: self.height,
-            color: Color::new(0x4f, 0x4f, 0x4f),
-        })
+    fn draw_floor(&mut self, camera: &Camera, level: &Level) {
+        // for y in 0..unsafe { SCREEN_HEIGHT } {
+        //     let camera_ray_dir: (f32, f32) = (
+        //         camera.rotation.degree.to_radians().cos(),
+        //         camera.rotation.degree.to_radians().sin(),
+        //     );
+        //     let plane = (0.0, 0.66);
+
+        //     let ray_dir_0 = (camera_ray_dir.0 - plane.0, camera_ray_dir.1 - plane.1);
+        //     let ray_dir_1 = (camera_ray_dir.0 + plane.0, camera_ray_dir.1 + plane.1);
+
+        //     let p_offset = (y - (unsafe { SCREEN_HEIGHT } / 2)) as f32;
+        //     let pos_z: f32 = (unsafe { SCREEN_HEIGHT } as f32) / 2.0;
+        //     let row_distance = pos_z / p_offset;
+
+        //     let floor_step = (
+        //         row_distance * (ray_dir_1.0 - ray_dir_0.0) / (unsafe { SCREEN_WIDTH } as f32),
+        //         row_distance * (ray_dir_1.1 - ray_dir_0.1) / (unsafe { SCREEN_WIDTH } as f32),
+        //     );
+        //     let mut floor = (
+        //         camera.pos.x + (row_distance * ray_dir_0.0),
+        //         camera.pos.y + (row_distance * ray_dir_0.1),
+        //     );
+
+        //     for x in 0..unsafe { SCREEN_WIDTH } {
+        //         floor.0 += floor_step.0;
+        //         floor.1 += floor_step.1;
+
+        //         self.draw_pixel(
+        //             Point::new((unsafe { SCREEN_HEIGHT } as f32) - (x as f32),  (y as f32)),
+        //             level.all_textures[3].get_color(&Point::new(
+        //                 (TEXTURE_WIDTH as f32) * (floor.0 - ((floor.0 as i32) as f32)),
+        //                 (TEXTURE_HEIGHT as f32) * (floor.1 - ((floor.1 as i32) as f32)),
+        //             )).clone(),
+        //         );
+        //     }
+        // }
+        for i in 0..unsafe { SCREEN_HEIGHT } / 2 {
+            self.draw_rect(Rect {
+                x: 0,
+                y: unsafe { SCREEN_HEIGHT } / 2 - i,
+                width: unsafe { SCREEN_WIDTH },
+                height: 1,
+                color: Color::new(
+                    ((255.0 / ((unsafe { SCREEN_HEIGHT } as f32) * 0.8)) * (i as f32) / 2.0).clamp(0.0, 255.0) as u8,
+                    ((255.0 / ((unsafe { SCREEN_HEIGHT } as f32) * 0.8)) * (i as f32) / 2.0).clamp(0.0, 255.0) as u8,
+                    ((255.0 / ((unsafe { SCREEN_HEIGHT } as f32) * 0.8)) * (i as f32) / 2.0).clamp(0.0, 255.0) as u8,
+                ),
+            });
+        }
+        
+        for i in 0..unsafe { SCREEN_HEIGHT } / 2 {
+            self.draw_rect(Rect {
+                x: 0,
+                y: i + unsafe { SCREEN_HEIGHT } / 2,
+                width: unsafe { SCREEN_WIDTH },
+                height: 1,
+                color: Color::new(
+                    ((255.0 / ((unsafe { SCREEN_HEIGHT } as f32) * 0.8)) * (i as f32) / 2.0).clamp(0.0, 255.0) as u8,
+                    ((255.0 / ((unsafe { SCREEN_HEIGHT } as f32) * 0.8)) * (i as f32) / 2.0).clamp(0.0, 255.0) as u8,
+                    ((255.0 / ((unsafe { SCREEN_HEIGHT } as f32) * 0.8)) * (i as f32) / 2.0).clamp(0.0, 255.0) as u8,
+                ),
+            });
+        }
     }
     fn flip_to_canvas(&self, canvas: &web_sys::CanvasRenderingContext2d) {
         match canvas.put_image_data(
@@ -638,20 +703,22 @@ pub fn start() -> Result<(), JsValue> {
             vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
             vec![1, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 1],
             vec![1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-            vec![1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1],
-            vec![1, 0, 0, 0, 2, 0, 1, 0, 2, 0, 0, 0, 1],
-            vec![1, 2, 0, 0, 0, 0, 1, 0, 0, 0, 0, 2, 1],
+            vec![1, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 1],
+            vec![1, 0, 0, 0, 2, 0, 3, 0, 2, 0, 0, 0, 1],
+            vec![1, 2, 0, 0, 0, 0, 3, 0, 0, 0, 0, 2, 1],
             vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         ],
         vec![
             Tile::new(0, false, true),
             Tile::new(1, true, false),
             Tile::new(2, true, false),
+            Tile::new(3, true, false),
         ],
         vec![
             Texture::new(Textures::Blank),
             Texture::new(Textures::BrickWall),
             Texture::new(Textures::Richardo),
+            Texture::new(Textures::Wood),
         ],
     );
     // Keyboard input
@@ -770,7 +837,7 @@ pub fn start() -> Result<(), JsValue> {
             }
             let mut frame_buffer: FrameBuffer = FrameBuffer::new(unsafe { SCREEN_WIDTH }, unsafe { SCREEN_HEIGHT });
 
-            frame_buffer.draw_background();
+            frame_buffer.draw_floor(unsafe { &PLAYER_CAMERA }, &current_level);
             frame_buffer.draw_walls(unsafe { &PLAYER_CAMERA }, &current_level);
             frame_buffer.draw_minimap(unsafe { &PLAYER_CAMERA }, &current_level);
 
