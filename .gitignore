@@ -10,3 +10,4 @@ Cargo.lock
 **/*.rs.bk
 
 /dist/
+/texture_parser/target/
