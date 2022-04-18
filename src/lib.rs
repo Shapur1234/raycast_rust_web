@@ -5,9 +5,6 @@ use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
-const TEXTURE_WIDTH: usize = 256;
-const TEXTURE_HEIGHT: usize = 256;
-
 static mut SCREEN_WIDTH: usize = 0;
 static mut SCREEN_HEIGHT: usize = 0;
 
@@ -63,9 +60,6 @@ struct Rect {
 }
 
 impl Rect {
-    fn new() -> Rect {
-        unimplemented!();
-    }
     fn fit_to_screen(&self, dest_width: usize, dest_height: usize) -> Rect {
         let mut rect_temp: Rect = *self;
 
@@ -239,15 +233,15 @@ struct Camera {
 }
 
 impl Camera {
-    fn new(pos: Point) -> Camera {
-        Camera {
-            pos: Point::new(pos.x, pos.y),
-            rotation: Rotation::new(0.0),
-            fov: 90,
-            resolution_multiplier: 16,
-            fish_eye_correction: true,
-        }
-    }
+    // fn new(pos: Point) -> Camera {
+    //     Camera {
+    //         pos: Point::new(pos.x, pos.y),
+    //         rotation: Rotation::new(0.0),
+    //         fov: 90,
+    //         resolution_multiplier: 16,
+    //         fish_eye_correction: true,
+    //     }
+    // }
     fn mod_fov(&mut self, value: i32) {
         self.fov = (((self.fov as i32) + value) as u32).clamp(1, 180);
     }
@@ -429,43 +423,7 @@ impl FrameBuffer {
             }
         }
     }
-    fn draw_floor(&mut self, camera: &Camera, level: &Level) {
-        // for y in 0..unsafe { SCREEN_HEIGHT } {
-        //     let camera_ray_dir: (f32, f32) = (
-        //         camera.rotation.degree.to_radians().cos(),
-        //         camera.rotation.degree.to_radians().sin(),
-        //     );
-        //     let plane = (0.0, 0.66);
-
-        //     let ray_dir_0 = (camera_ray_dir.0 - plane.0, camera_ray_dir.1 - plane.1);
-        //     let ray_dir_1 = (camera_ray_dir.0 + plane.0, camera_ray_dir.1 + plane.1);
-
-        //     let p_offset = (y - (unsafe { SCREEN_HEIGHT } / 2)) as f32;
-        //     let pos_z: f32 = (unsafe { SCREEN_HEIGHT } as f32) / 2.0;
-        //     let row_distance = pos_z / p_offset;
-
-        //     let floor_step = (
-        //         row_distance * (ray_dir_1.0 - ray_dir_0.0) / (unsafe { SCREEN_WIDTH } as f32),
-        //         row_distance * (ray_dir_1.1 - ray_dir_0.1) / (unsafe { SCREEN_WIDTH } as f32),
-        //     );
-        //     let mut floor = (
-        //         camera.pos.x + (row_distance * ray_dir_0.0),
-        //         camera.pos.y + (row_distance * ray_dir_0.1),
-        //     );
-
-        //     for x in 0..unsafe { SCREEN_WIDTH } {
-        //         floor.0 += floor_step.0;
-        //         floor.1 += floor_step.1;
-
-        //         self.draw_pixel(
-        //             Point::new((unsafe { SCREEN_HEIGHT } as f32) - (x as f32),  (y as f32)),
-        //             level.all_textures[3].get_color(&Point::new(
-        //                 (TEXTURE_WIDTH as f32) * (floor.0 - ((floor.0 as i32) as f32)),
-        //                 (TEXTURE_HEIGHT as f32) * (floor.1 - ((floor.1 as i32) as f32)),
-        //             )).clone(),
-        //         );
-        //     }
-        // }
+    fn draw_floor(&mut self) {
         for i in 0..unsafe { SCREEN_HEIGHT } / 2 {
             self.draw_rect(Rect {
                 x: 0,
@@ -837,7 +795,7 @@ pub fn start() -> Result<(), JsValue> {
             }
             let mut frame_buffer: FrameBuffer = FrameBuffer::new(unsafe { SCREEN_WIDTH }, unsafe { SCREEN_HEIGHT });
 
-            frame_buffer.draw_floor(unsafe { &PLAYER_CAMERA }, &current_level);
+            frame_buffer.draw_floor();
             frame_buffer.draw_walls(unsafe { &PLAYER_CAMERA }, &current_level);
             frame_buffer.draw_minimap(unsafe { &PLAYER_CAMERA }, &current_level);
 
