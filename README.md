@@ -1,4 +1,4 @@
-# Raycast Web
+# Raycaster
 
 Rust (https://www.rust-lang.org/tools/install) and Trunk (https://trunkrs.dev/) is needed to run the project
 
