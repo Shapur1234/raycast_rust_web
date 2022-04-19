@@ -16,3 +16,5 @@ Num1, Num2  - Increase / Decrease render resolution
 Num3        - Toggle fisheye correction
 Num4, Num5  - Increase / Decrease FOV
 ```
+
+Partial python version of this: https://github.com/Shapur1234/Raycast-Python
