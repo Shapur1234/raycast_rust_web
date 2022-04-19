@@ -7,7 +7,7 @@ To run locally:
 $ trunk serve --release
 ```
 
-Controls:
+Controls (Click the image to start):
 ```
 W, S, A, D  - Move
 Q, E        - Rotate
