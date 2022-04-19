@@ -11,3 +11,4 @@ Cargo.lock
 
 /dist/
 /texture_parser/target/
+/texture_parser/out.txt
