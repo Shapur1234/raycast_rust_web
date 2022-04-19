@@ -1,13 +1,8 @@
 # Raycaster
 
-Rust (https://www.rust-lang.org/tools/install) and Trunk (https://trunkrs.dev/) is needed to run the project
+### [Live Demo](https://shapur1234.github.io/raycaster/ "Link to live demo (mobile controls not supported)")
 
-To run locally:
-```
-$ trunk serve --release
-```
-
-Controls:
+* #### Controls:
 ```
 W, S, A, D  - Move
 Q, E        - Rotate
@@ -17,4 +12,12 @@ Num3        - Toggle fisheye correction
 Num4, Num5  - Increase / Decrease FOV
 ```
 
-Partial python version of this: https://github.com/Shapur1234/Raycast-Python
+#### To run locally:
+
+Rust (https://www.rust-lang.org/tools/install) and Trunk (https://trunkrs.dev/) is needed to run the project
+
+```
+$ trunk serve --release
+```
+
+_Partial python version of this project can be found [here](https://github.com/Shapur1234/Raycast-Python)._
