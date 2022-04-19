@@ -1,6 +1,6 @@
 # Raycaster
 
-![This is a alt text.](/docs/img/screenshot.jpg?raw=true "Screenshot.")
+![This is a alt text.](/docs/img/screenshot.jpg?raw=true "Screenshot of the raycaster")
 
 ### [Live Demo](https://shapur1234.github.io/raycaster/ "Link to live demo (mobile controls not supported)")
 
