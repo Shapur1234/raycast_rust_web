@@ -14,7 +14,7 @@ Num4, Num5  - Increase / Decrease FOV
 
 #### To run locally:
 
-Rust (https://www.rust-lang.org/tools/install) and Trunk (https://trunkrs.dev/) is needed to run the project
+[Rust](https://www.rust-lang.org/tools/install) and [Trunk](https://trunkrs.dev/) are needed to run / build the project
 
 ```
 $ trunk serve --release
