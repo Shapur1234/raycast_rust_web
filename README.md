@@ -21,5 +21,3 @@ Num4, Num5  - Increase / Decrease FOV
 ```
 $ trunk serve --release
 ```
-
-_Partial python version of this project can be found [here](https://github.com/Shapur1234/Raycast-Python)._
